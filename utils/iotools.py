@@ -7,7 +7,6 @@
 import errno
 import json
 import os
-
 import os.path as osp
 
 
@@ -28,12 +27,12 @@ def check_isfile(path):
 
 
 def read_json(fpath):
-    with open(fpath, 'r') as f:
+    with open(fpath, "r") as f:
         obj = json.load(f)
     return obj
 
 
 def write_json(obj, fpath):
     mkdir_if_missing(osp.dirname(fpath))
-    with open(fpath, 'w') as f:
-        json.dump(obj, f, indent=4, separators=(',', ': '))
+    with open(fpath, "w") as f:
+        json.dump(obj, f, indent=4, separators=(",", ": "))
