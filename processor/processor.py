@@ -4,7 +4,7 @@ import os
 import torch
 import torch.distributed as dist
 import torch.nn as nn
-from torch.cuda import amp
+from torch import amp
 
 from utils.meter import AverageMeter
 from utils.metrics import R1_mAP_eval
@@ -27,12 +27,12 @@ def do_train(
     checkpoint_period = cfg.SOLVER.CHECKPOINT_PERIOD
     eval_period = cfg.SOLVER.EVAL_PERIOD
 
-    device = "cuda"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     epochs = cfg.SOLVER.MAX_EPOCHS
 
     logger = logging.getLogger("transreid.train")
     logger.info("start training")
-    if device:
+    if device != "cpu":
         model.to(local_rank)
         if torch.cuda.device_count() > 1:
             print("Using {} GPUs for training".format(torch.cuda.device_count()))
@@ -42,7 +42,7 @@ def do_train(
     acc_meter = AverageMeter()
 
     evaluator = R1_mAP_eval(num_query, max_rank=50, feat_norm=cfg.TEST.FEAT_NORM)
-    scaler = amp.GradScaler()
+    scaler = amp.GradScaler(device)
 
     # train
     import time
@@ -73,7 +73,7 @@ def do_train(
                 target_view = target_view.to(device)
             else:
                 target_view = None
-            with amp.autocast(enabled=True):
+            with amp.autocast(device, enabled=True):
                 score, feat = model(
                     img, target, cam_label=target_cam, view_label=target_view
                 )
@@ -97,7 +97,7 @@ def do_train(
             loss_meter.update(loss.item(), img.shape[0])
             acc_meter.update(acc, 1)
 
-            torch.cuda.synchronize()
+            # torch.cuda.synchronize()
             if (n_iter + 1) % log_period == 0:
                 logger.info(
                     "Epoch[{}] Iteration[{}/{}] Loss: {:.3f}, Acc: {:.3f}, Base Lr: {:.2e}".format(
@@ -164,7 +164,7 @@ def do_train(
                         logger.info(
                             "CMC curve, Rank-{:<3}:{:.1%}".format(r, cmc[r - 1])
                         )
-                    torch.cuda.empty_cache()
+                    # torch.cuda.empty_cache()
             else:
                 model.eval()
                 for _, (img, vid, camid, camids, target_view, _) in enumerate(
@@ -187,7 +187,7 @@ def do_train(
                 logger.info("mAP: {:.1%}".format(mAP))
                 for r in [1, 5, 10]:
                     logger.info("CMC curve, Rank-{:<3}:{:.1%}".format(r, cmc[r - 1]))
-                torch.cuda.empty_cache()
+                # torch.cuda.empty_cache()
 
     all_end_time = time.monotonic()
     total_time = timedelta(seconds=all_end_time - all_start_time)
@@ -196,7 +196,7 @@ def do_train(
 
 
 def do_inference(cfg, model, val_loader, num_query):
-    device = "cuda"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     logger = logging.getLogger("transreid.test")
     logger.info("Enter inferencing")
 
@@ -204,7 +204,7 @@ def do_inference(cfg, model, val_loader, num_query):
 
     evaluator.reset()
 
-    if device:
+    if device != "cpu":
         if torch.cuda.device_count() > 1:
             print("Using {} GPUs for inference".format(torch.cuda.device_count()))
             model = nn.DataParallel(model)

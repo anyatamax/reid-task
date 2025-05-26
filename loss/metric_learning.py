@@ -111,7 +111,10 @@ class Arcface(nn.Module):
             phi = torch.where(cosine > self.th, phi, cosine - self.mm)
         # --------------------------- convert label to one-hot ---------------------------
         # one_hot = torch.zeros(cosine.size(), requires_grad=True, device='cuda')
-        one_hot = torch.zeros(cosine.size(), device="cuda")
+        one_hot = torch.zeros(
+            cosine.size(),
+            device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        )
         one_hot.scatter_(1, label.view(-1, 1).long(), 1)
         if self.ls_eps > 0:
             one_hot = (1 - self.ls_eps) * one_hot + self.ls_eps / self.out_features
@@ -146,7 +149,10 @@ class Cosface(nn.Module):
         cosine = F.linear(F.normalize(input), F.normalize(self.weight))
         phi = cosine - self.m
         # --------------------------- convert label to one-hot ---------------------------
-        one_hot = torch.zeros(cosine.size(), device="cuda")
+        one_hot = torch.zeros(
+            cosine.size(),
+            device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        )
         # one_hot = one_hot.cuda() if cosine.is_cuda else one_hot
         one_hot.scatter_(1, label.view(-1, 1).long(), 1)
         # -------------torch.where(out_i = {x_i if condition_i else y_i) -------------
@@ -196,9 +202,10 @@ class AMSoftmax(nn.Module):
         costh = torch.mm(x_norm, w_norm)
         # print(x_norm.shape, w_norm.shape, costh.shape)
         lb_view = lb.view(-1, 1)
-        delt_costh = torch.zeros(costh.size(), device="cuda").scatter_(
-            1, lb_view, self.m
-        )
+        delt_costh = torch.zeros(
+            costh.size(),
+            device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        ).scatter_(1, lb_view, self.m)
         costh_m = costh - delt_costh
         costh_m_s = self.s * costh_m
         return costh_m_s

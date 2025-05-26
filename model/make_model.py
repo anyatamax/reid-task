@@ -77,7 +77,7 @@ class build_transformer(nn.Module):
             self.w_resolution,
             self.vision_stride_size,
         )
-        clip_model.to("cuda")
+        clip_model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
 
         self.image_encoder = clip_model.visual
 

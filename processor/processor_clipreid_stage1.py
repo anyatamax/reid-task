@@ -4,7 +4,7 @@ import os
 import torch
 import torch.distributed as dist
 import torch.nn as nn
-from torch.cuda import amp
+from torch import amp
 
 from loss.supcontrast import SupConLoss
 from utils.meter import AverageMeter
@@ -12,20 +12,20 @@ from utils.meter import AverageMeter
 
 def do_train_stage1(cfg, model, train_loader_stage1, optimizer, scheduler, local_rank):
     checkpoint_period = cfg.SOLVER.STAGE1.CHECKPOINT_PERIOD
-    device = "cuda"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     epochs = cfg.SOLVER.STAGE1.MAX_EPOCHS
     log_period = cfg.SOLVER.STAGE1.LOG_PERIOD
 
     logger = logging.getLogger("transreid.train")
     logger.info("start training")
-    if device:
+    if device != "cpu":
         model.to(local_rank)
         if torch.cuda.device_count() > 1:
             print("Using {} GPUs for training".format(torch.cuda.device_count()))
             model = nn.DataParallel(model)
 
     loss_meter = AverageMeter()
-    scaler = amp.GradScaler()
+    scaler = amp.GradScaler(device)
     xent = SupConLoss(device)
 
     # train
@@ -40,13 +40,16 @@ def do_train_stage1(cfg, model, train_loader_stage1, optimizer, scheduler, local
         for _, (img, vid, _, _) in enumerate(train_loader_stage1):
             img = img.to(device)
             target = vid.to(device)
-            with amp.autocast(enabled=True):
+            with amp.autocast(device, enabled=True):
+                print(device)
                 image_feature = model(img, target, get_image=True)
                 for i, img_feat in zip(target, image_feature):
                     labels.append(i)
                     image_features.append(img_feat.cpu())
-        labels_list = torch.stack(labels, dim=0).cuda()  # N
-        image_features_list = torch.stack(image_features, dim=0).cuda()
+        # labels_list = torch.stack(labels, dim=0).cuda()  # N
+        labels_list = torch.stack(labels, dim=0)
+        # image_features_list = torch.stack(image_features, dim=0).cuda()
+        image_features_list = torch.stack(image_features, dim=0)
 
         batch = cfg.SOLVER.STAGE1.IMS_PER_BATCH
         num_image = labels_list.shape[0]
@@ -68,7 +71,7 @@ def do_train_stage1(cfg, model, train_loader_stage1, optimizer, scheduler, local
 
             target = labels_list[b_list]
             image_features = image_features_list[b_list]
-            with amp.autocast(enabled=True):
+            with amp.autocast(device, enabled=True):
                 text_features = model(label=target, get_text=True)
             loss_i2t = xent(image_features, text_features, target, target)
             loss_t2i = xent(text_features, image_features, target, target)
@@ -82,7 +85,7 @@ def do_train_stage1(cfg, model, train_loader_stage1, optimizer, scheduler, local
 
             loss_meter.update(loss.item(), img.shape[0])
 
-            torch.cuda.synchronize()
+            # torch.cuda.synchronize()
             if (i + 1) % log_period == 0:
                 logger.info(
                     "Epoch[{}] Iteration[{}/{}] Loss: {:.3f}, Base Lr: {:.2e}".format(

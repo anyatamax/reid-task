@@ -65,10 +65,9 @@ TEST:
   FEAT_NORM: "yes"
 
 DATASETS:
-#   NAMES: ('market1501')
-#   ROOT_DIR: ('')
-# OUTPUT_DIR: ''
-
+  NAMES: ('market1501')
+  ROOT_DIR: ('')
+OUTPUT_DIR: ""
 #   NAMES: ('dukemtmc')
 #   ROOT_DIR: ('')
 # OUTPUT_DIR: ''
@@ -81,4 +80,4 @@ DATASETS:
 #   ROOT_DIR: ('')
 # OUTPUT_DIR: ''
 
-# CUDA_VISIBLE_DEVICES=1 python train_clipreid.py --config_file configs/person/res_clipreid.yml
+# CUDA_VISIBLE_DEVICES=1 python train_clipreid.py --config_file configs/person/cnn_clipreid.yml

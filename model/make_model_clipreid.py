@@ -102,7 +102,7 @@ class build_transformer(nn.Module):
             self.w_resolution,
             self.vision_stride_size,
         )
-        clip_model.to("cuda")
+        clip_model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
 
         self.image_encoder = clip_model.visual
 
@@ -257,7 +257,8 @@ class PromptLearner(nn.Module):
         ctx_init = ctx_init.replace("_", " ")
         n_ctx = 4
 
-        tokenized_prompts = clip.tokenize(ctx_init).cuda()
+        # tokenized_prompts = clip.tokenize(ctx_init).cuda()
+        tokenized_prompts = clip.tokenize(ctx_init)
         with torch.no_grad():
             embedding = token_embedding(tokenized_prompts).type(dtype)
         self.tokenized_prompts = tokenized_prompts  # torch.Tensor
