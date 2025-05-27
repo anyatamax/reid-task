@@ -5,22 +5,22 @@ from timm.data.random_erasing import RandomErasing
 from torch.utils.data import DataLoader
 
 from .bases import ImageDataset
-from .dukemtmcreid import DukeMTMCreID
+# from .dukemtmcreid import DukeMTMCreID
 from .market1501 import Market1501
-from .msmt17 import MSMT17
-from .occ_duke import OCC_DukeMTMCreID
+# from .msmt17 import MSMT17
+# from .occ_duke import OCC_DukeMTMCreID
 from .sampler import RandomIdentitySampler
 from .sampler_ddp import RandomIdentitySampler_DDP
-from .vehicleid import VehicleID
-from .veri import VeRi
+# from .vehicleid import VehicleID
+# from .veri import VeRi
 
 __factory = {
     "market1501": Market1501,
-    "dukemtmc": DukeMTMCreID,
-    "msmt17": MSMT17,
-    "occ_duke": OCC_DukeMTMCreID,
-    "veri": VeRi,
-    "VehicleID": VehicleID,
+    # "dukemtmc": DukeMTMCreID,
+    # "msmt17": MSMT17,
+    # "occ_duke": OCC_DukeMTMCreID,
+    # "veri": VeRi,
+    # "VehicleID": VehicleID,
 }
 
 
