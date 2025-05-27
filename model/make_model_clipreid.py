@@ -50,10 +50,9 @@ class TextEncoder(nn.Module):
 
         # x.shape = [batch_size, n_ctx, transformer.width]
         # take features from the eot embedding (eot_token is the highest number in each sequence)
-        x = (
-            x[torch.arange(x.shape[0]), tokenized_prompts.argmax(dim=-1)]
-            @ self.text_projection
-        )
+        batch_indices = torch.arange(x.shape[0], device=torch.device("cpu"))
+        eot_indices = tokenized_prompts.argmax(dim=-1).to(torch.device("cpu"))
+        x = x[batch_indices, eot_indices] @ self.text_projection
         return x
 
 
@@ -257,8 +256,8 @@ class PromptLearner(nn.Module):
         ctx_init = ctx_init.replace("_", " ")
         n_ctx = 4
 
-        # tokenized_prompts = clip.tokenize(ctx_init).cuda()
-        tokenized_prompts = clip.tokenize(ctx_init)
+        tokenized_prompts = clip.tokenize(ctx_init).cuda()
+        # tokenized_prompts = clip.tokenize(ctx_init)
         with torch.no_grad():
             embedding = token_embedding(tokenized_prompts).type(dtype)
         self.tokenized_prompts = tokenized_prompts  # torch.Tensor

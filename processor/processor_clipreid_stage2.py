@@ -69,8 +69,8 @@ def do_train_stage2(
             with amp.autocast(device, enabled=True):
                 text_feature = model(label=l_list, get_text=True)
             text_features.append(text_feature.cpu())
-        # text_features = torch.cat(text_features, 0).cuda()
-        text_features = torch.cat(text_features, 0)
+        text_features = torch.cat(text_features, 0).cuda()
+        # text_features = torch.cat(text_features, 0)
 
     for epoch in range(1, epochs + 1):
         start_time = time.time()
@@ -119,7 +119,8 @@ def do_train_stage2(
             loss_meter.update(loss.item(), img.shape[0])
             acc_meter.update(acc, 1)
 
-            # torch.cuda.synchronize()
+            if device != "cpu":
+                torch.cuda.synchronize()
             if (n_iter + 1) % log_period == 0:
                 logger.info(
                     "Epoch[{}] Iteration[{}/{}] Loss: {:.3f}, Acc: {:.3f}, Base Lr: {:.2e}".format(
@@ -188,7 +189,8 @@ def do_train_stage2(
                         logger.info(
                             "CMC curve, Rank-{:<3}:{:.1%}".format(r, cmc[r - 1])
                         )
-                    # torch.cuda.empty_cache()
+                    if device != "cpu":
+                        torch.cuda.empty_cache()
             else:
                 model.eval()
                 for _, (img, vid, camid, camids, target_view, _) in enumerate(
@@ -211,7 +213,8 @@ def do_train_stage2(
                 logger.info("mAP: {:.1%}".format(mAP))
                 for r in [1, 5, 10]:
                     logger.info("CMC curve, Rank-{:<3}:{:.1%}".format(r, cmc[r - 1]))
-                # torch.cuda.empty_cache()
+                if device != "cpu":
+                    torch.cuda.empty_cache()
 
     all_end_time = time.monotonic()
     total_time = timedelta(seconds=all_end_time - all_start_time)

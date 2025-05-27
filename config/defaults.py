@@ -18,7 +18,7 @@ _C.MODEL = CN()
 # Using cuda or cpu for training
 _C.MODEL.DEVICE = "cuda"
 # ID number of GPU
-_C.MODEL.DEVICE_ID = "0"
+_C.MODEL.DEVICE_ID = "0,2,3"
 # Name of backbone
 _C.MODEL.NAME = "resnet50"
 # Last stride of backbone
@@ -113,7 +113,7 @@ _C.SOLVER.MARGIN = 0.3
 # Name of optimizer
 _C.SOLVER.STAGE1 = CN()
 
-_C.SOLVER.STAGE1.IMS_PER_BATCH = 64
+_C.SOLVER.STAGE1.IMS_PER_BATCH = 8
 
 _C.SOLVER.STAGE1.OPTIMIZER_NAME = "Adam"
 # Number of max epoches
@@ -158,7 +158,7 @@ _C.SOLVER.STAGE1.EVAL_PERIOD = 10
 # ---------------------------------------------------------------------------- #
 _C.SOLVER.STAGE2 = CN()
 
-_C.SOLVER.STAGE2.IMS_PER_BATCH = 64
+_C.SOLVER.STAGE2.IMS_PER_BATCH = 8
 # Name of optimizer
 _C.SOLVER.STAGE2.OPTIMIZER_NAME = "Adam"
 # Number of max epoches
@@ -216,7 +216,7 @@ _C.SOLVER.STAGE2.EVAL_PERIOD = 10
 
 _C.TEST = CN()
 # Number of images per batch during test
-_C.TEST.IMS_PER_BATCH = 128
+_C.TEST.IMS_PER_BATCH = 32
 # If test with re-ranking, options: 'True','False'
 _C.TEST.RE_RANKING = False
 # Path to trained model

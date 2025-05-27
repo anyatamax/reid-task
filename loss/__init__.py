@@ -1,1 +1,1 @@
-from .arcface import ArcFace
+# from .arcface import ArcFace

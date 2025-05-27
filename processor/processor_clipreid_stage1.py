@@ -39,16 +39,13 @@ def do_train_stage1(cfg, model, train_loader_stage1, optimizer, scheduler, local
     with torch.no_grad():
         for _, (img, vid, _, _) in enumerate(train_loader_stage1):
             img = img.to(device)
-            target = vid.to(device)
+            target = vid
             with amp.autocast(device, enabled=True):
-                print(device)
-                image_feature = model(img, target, get_image=True)
+                image_feature = model(img, target.to(device), get_image=True)
                 for i, img_feat in zip(target, image_feature):
-                    labels.append(i)
+                    labels.append(i.cpu())
                     image_features.append(img_feat.cpu())
-        # labels_list = torch.stack(labels, dim=0).cuda()  # N
         labels_list = torch.stack(labels, dim=0)
-        # image_features_list = torch.stack(image_features, dim=0).cuda()
         image_features_list = torch.stack(image_features, dim=0)
 
         batch = cfg.SOLVER.STAGE1.IMS_PER_BATCH
@@ -61,16 +58,17 @@ def do_train_stage1(cfg, model, train_loader_stage1, optimizer, scheduler, local
         scheduler.step(epoch)
         model.train()
 
-        iter_list = torch.randperm(num_image).to(device)
+        iter_list = torch.randperm(num_image)
         for i in range(i_ter + 1):
+            print(i)
             optimizer.zero_grad()
             if i != i_ter:
                 b_list = iter_list[i * batch : (i + 1) * batch]
             else:
                 b_list = iter_list[i * batch : num_image]
 
-            target = labels_list[b_list]
-            image_features = image_features_list[b_list]
+            target = labels_list[b_list].to(device)
+            image_features = image_features_list[b_list].to(device)
             with amp.autocast(device, enabled=True):
                 text_features = model(label=target, get_text=True)
             loss_i2t = xent(image_features, text_features, target, target)
@@ -85,7 +83,8 @@ def do_train_stage1(cfg, model, train_loader_stage1, optimizer, scheduler, local
 
             loss_meter.update(loss.item(), img.shape[0])
 
-            # torch.cuda.synchronize()
+            if device != "cpu":
+                torch.cuda.synchronize()
             if (i + 1) % log_period == 0:
                 logger.info(
                     "Epoch[{}] Iteration[{}/{}] Loss: {:.3f}, Base Lr: {:.2e}".format(
