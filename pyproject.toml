@@ -17,7 +17,8 @@ dependencies = [
     "fire (>=0.7.0,<0.8.0)",
     "ftfy (>=6.3.1,<7.0.0)",
     "regex (>=2024.11.6,<2025.0.0)",
-    "pre-commit (>=4.2.0,<5.0.0)"
+    "pre-commit (>=4.2.0,<5.0.0)",
+    "pytorch-lightning (>=2.5.1.post0,<3.0.0)"
 ]
 
 

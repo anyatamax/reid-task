@@ -55,7 +55,6 @@ def do_train_stage1(cfg, model, train_loader_stage1, optimizer, scheduler, local
 
     for epoch in range(1, epochs + 1):
         loss_meter.reset()
-        scheduler.step(epoch)
         model.train()
 
         iter_list = torch.randperm(num_image)
@@ -95,6 +94,8 @@ def do_train_stage1(cfg, model, train_loader_stage1, optimizer, scheduler, local
                         scheduler._get_lr(epoch)[0],
                     )
                 )
+
+        scheduler.step(epoch)
 
         if epoch % checkpoint_period == 0:
             if cfg.MODEL.DIST_TRAIN:
