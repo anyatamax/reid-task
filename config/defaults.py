@@ -18,9 +18,11 @@ _C.MODEL = CN()
 # Using cuda or cpu for training
 _C.MODEL.DEVICE = "cuda"
 # ID number of GPU
-_C.MODEL.DEVICE_ID = "1,2,3,7"
+_C.MODEL.DEVICE_ID = "1,2,3,5"
 # Name of backbone
 _C.MODEL.NAME = "resnet50"
+# Path to checkpoint
+_C.MODEL.MODEL_CHKP_NAME_STAGE1 = "RN50_stage1_60.pth"
 # Last stride of backbone
 _C.MODEL.LAST_STRIDE = 1
 # Path to pretrained model of backbone

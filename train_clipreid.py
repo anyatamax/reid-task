@@ -1,9 +1,11 @@
 import argparse
 import os
 import random
+import datetime
 
 import numpy as np
 import torch
+import torch.multiprocessing as mp
 
 from config import cfg
 from datasets.data import CLIPReIDDataModule
@@ -12,6 +14,7 @@ from model.model_pl import CLIPReIDModule
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor, EarlyStopping, ModelSummary, Timer
 from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.strategies import DDPStrategy
 
 def set_seed(seed):
     torch.manual_seed(seed)
@@ -68,7 +71,7 @@ def main():
     model = CLIPReIDModule(
         cfg=cfg,
         num_classes=dataset_info["num_classes"],
-        camera_num=dataset_info["cam_num"],
+        camera_num=dataset_info["camera_num"],
         view_num=dataset_info["view_num"],
         num_query=dataset_info["num_query"]
     )
@@ -89,7 +92,6 @@ def main():
             mode="max",
             verbose=True,
         ),
-        ModelSummary(max_depth=5),
         Timer()
     ]
     
@@ -99,11 +101,21 @@ def main():
         default_hp_metric=False,
     )
     
+    if cfg.MODEL.DIST_TRAIN:
+        strategy = DDPStrategy(
+            process_group_backend="nccl",
+            find_unused_parameters=False,
+            timeout=datetime.timedelta(seconds=1800),
+            gradient_as_bucket_view=True,
+        )
+    else:
+        strategy = "auto"
+    
     trainer = pl.Trainer(
         max_epochs=cfg.SOLVER.STAGE1.MAX_EPOCHS + cfg.SOLVER.STAGE2.MAX_EPOCHS,
         accelerator="gpu",
-        devices=[1,3,7],
-        strategy="ddp",
+        devices="auto",
+        strategy=strategy,
         precision="16-mixed",
         callbacks=callbacks,
         logger=logger,
@@ -111,6 +123,9 @@ def main():
         check_val_every_n_epoch=cfg.SOLVER.STAGE2.EVAL_PERIOD,
         deterministic=True,
     )
+    
+    if cfg.MODEL.DIST_TRAIN and mp.get_start_method(allow_none=True) != 'spawn':
+        mp.set_start_method('spawn', force=True)
     
     trainer.fit(model, data_module)
 

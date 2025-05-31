@@ -28,9 +28,10 @@ class CLIPReIDModule(pl.LightningModule):
         self.model = make_model(
             cfg, num_class=num_classes, camera_num=camera_num, view_num=view_num
         )
+        for n, p in self.model.named_parameters():
+            print(n, p.device, p.requires_grad)
         
         self.loss_fn, self.center_criterion = make_loss(cfg, num_classes=num_classes)
-        self.xent = SupConLoss(device=self.device)
         self.loss_meter = AverageMeter()
         self.acc_meter = AverageMeter()
 
@@ -56,27 +57,12 @@ class CLIPReIDModule(pl.LightningModule):
             'interval': 'epoch',
             'frequency': 1
         }
-
-        optimizer_2stage, optimizer_center_2stage = make_optimizer_2stage(
-            self.cfg, self.model, self.center_criterion
-        )
-        scheduler_2stage = WarmupMultiStepLR(
-            optimizer_2stage,
-            self.cfg.SOLVER.STAGE2.STEPS,
-            self.cfg.SOLVER.STAGE2.GAMMA,
-            self.cfg.SOLVER.STAGE2.WARMUP_FACTOR,
-            self.cfg.SOLVER.STAGE2.WARMUP_ITERS,
-            self.cfg.SOLVER.STAGE2.WARMUP_METHOD,
-        )
-        scheduler_2stage = {
-            'scheduler': scheduler_2stage,
-            'interval': 'epoch',
-            'frequency': 1
-        }
         
-        return [optimizer_1stage, optimizer_2stage, optimizer_center_2stage], [scheduler_1stage, scheduler_2stage]
+        return [optimizer_1stage, optimizer_1stage, optimizer_1stage], [scheduler_1stage, scheduler_1stage]
     
     def on_train_start(self):
+        self.xent = SupConLoss(device=self.device)
+        
         if self.stage == 1:
             model_path = os.path.join(self.cfg.OUTPUT_DIR, self.cfg.MODEL.MODEL_CHKP_NAME_STAGE1)
             if not os.path.exists(model_path):
@@ -95,7 +81,6 @@ class CLIPReIDModule(pl.LightningModule):
                 self.stage = 2
     
     def extract_image_features(self):
-        self.model.eval()
         image_features = []
         labels = []
 
@@ -106,7 +91,7 @@ class CLIPReIDModule(pl.LightningModule):
             for _, (img, vid, _, _) in enumerate(dataloader):
                 img = img.to(self.device)
                 target = vid
-                with amp.autocast(self.device, enabled=True):
+                with amp.autocast(self.device.type, enabled=True):
                     image_feature = self.model(img, target.to(self.device), get_image=True)
                     for i, img_feat in zip(target, image_feature):
                         labels.append(i.cpu())
@@ -125,9 +110,27 @@ class CLIPReIDModule(pl.LightningModule):
         del labels, image_features
     
     def prepare_stage2(self):
-        self.model.eval()
-        text_features = []
+        optimizer_2stage, optimizer_center_2stage = make_optimizer_2stage(
+            self.cfg, self.model, self.center_criterion
+        )
+        scheduler_2stage = WarmupMultiStepLR(
+            optimizer_2stage,
+            self.cfg.SOLVER.STAGE2.STEPS,
+            self.cfg.SOLVER.STAGE2.GAMMA,
+            self.cfg.SOLVER.STAGE2.WARMUP_FACTOR,
+            self.cfg.SOLVER.STAGE2.WARMUP_ITERS,
+            self.cfg.SOLVER.STAGE2.WARMUP_METHOD,
+        )
+        scheduler_2stage = {
+            'scheduler': scheduler_2stage,
+            'interval': 'epoch',
+            'frequency': 1
+        }
+        self.optimizers()[1] = optimizer_2stage
+        self.optimizers()[1] = optimizer_center_2stage
+        self.lr_schedulers()[1] = scheduler_2stage
         
+        text_features = []
         batch = self.cfg.SOLVER.STAGE2.IMS_PER_BATCH
         i_ter = self.num_classes // batch
         left = self.num_classes - batch * (self.num_classes // batch)
@@ -140,7 +143,7 @@ class CLIPReIDModule(pl.LightningModule):
                     l_list = torch.arange(i * batch, (i + 1) * batch)
                 else:
                     l_list = torch.arange(i * batch, self.num_classes)
-                with amp.autocast(self.device, enabled=True):
+                with amp.autocast(self.device.type, enabled=True):
                     text_feature = self.model(label=l_list.to(self.device), get_text=True)
                 text_features.append(text_feature.cpu())
             
@@ -165,8 +168,7 @@ class CLIPReIDModule(pl.LightningModule):
         
         target = self.labels_list[b_list].to(self.device)
         image_features = self.image_features_list[b_list].to(self.device)
-        
-        with amp.autocast(self.device, enabled=True):
+        with amp.autocast(self.device.type, enabled=True):
             text_features = self.model(label=target, get_text=True)
         
         loss_i2t = self.xent(image_features, text_features, target, target)
@@ -212,7 +214,7 @@ class CLIPReIDModule(pl.LightningModule):
         else:
             target_view = None
         
-        with amp.autocast(self.device, enabled=True):
+        with amp.autocast(self.device.type, enabled=True):
             score, feat, image_features = self.model(
                 x=img, label=target, cam_label=target_cam, view_label=target_view
             )
@@ -255,10 +257,13 @@ class CLIPReIDModule(pl.LightningModule):
             self.loss_meter.reset()
             self.model.train()
             self.iter_list = torch.randperm(self.num_image)
+            self.trainer.fit_loop.epoch_loop.max_steps = self.i_ter
+
         else:
             self.loss_meter.reset()
             self.acc_meter.reset()
             self.model.train()
+            self.trainer.fit_loop.epoch_loop.max_steps = len(self.trainer.train_dataloader)
 
     def on_train_epoch_end(self):
         if self.stage == 1 and self.current_epoch >= self.cfg.SOLVER.STAGE1.MAX_EPOCHS - 1:

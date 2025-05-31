@@ -15,7 +15,7 @@ from .sampler_ddp import RandomIdentitySampler_DDP
 # from .vehicleid import VehicleID
 # from .veri import VeRi
 
-__factory = {
+factory = {
     "market1501": Market1501,
     # "dukemtmc": DukeMTMCreID,
     # "msmt17": MSMT17,
@@ -81,7 +81,7 @@ class CLIPReIDDataModule(pl.LightningDataModule):
         
     
     def setup(self, stage = None):
-        self.dataset = __factory[self.cfg.DATASETS.NAMES](root=self.cfg.DATASETS.ROOT_DIR)
+        self.dataset = factory[self.cfg.DATASETS.NAMES](root=self.cfg.DATASETS.ROOT_DIR)
         self.num_classes = self.dataset.num_train_pids
         self.cam_num = self.dataset.num_train_cams
         self.view_num = self.dataset.num_train_vids
