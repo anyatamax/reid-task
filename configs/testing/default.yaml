@@ -1,0 +1,19 @@
+# ---------------------------------------------------------------------------- #
+# TEST
+# ---------------------------------------------------------------------------- #
+# Whether to evaluate the model during testing
+eval: true
+# Number of images per batch during test
+ims_per_batch: 32
+# If test with re-ranking
+re_ranking: false
+# Path to trained model
+weight: ""
+# Which feature of BNNeck to be used for test, before or after BNNneck
+# Options: 'before' or 'after'
+neck_feat: "after"
+# Whether feature is normalized before test
+# If yes, it is equivalent to cosine distance
+feat_norm: "yes"
+# Name for saving the distmat after testing
+dist_mat: "dist_mat.npy"

@@ -3,9 +3,8 @@ import torch.nn as nn
 from timm.models.layers import trunc_normal_
 
 from .clip import clip
-from .clip.simple_tokenizer import SimpleTokenizer as _Tokenizer
-
-_tokenizer = _Tokenizer()
+from .clip.model import build_model
+from configs.constants import MODELS
 
 
 def weights_init_kaiming(m):
@@ -59,10 +58,10 @@ class TextEncoder(nn.Module):
 class build_transformer(nn.Module):
     def __init__(self, num_classes, camera_num, view_num, cfg):
         super(build_transformer, self).__init__()
-        self.model_name = cfg.MODEL.NAME
-        self.cos_layer = cfg.MODEL.COS_LAYER
-        self.neck = cfg.MODEL.NECK
-        self.neck_feat = cfg.TEST.NECK_FEAT
+        self.model_name = cfg.model.name
+        self.cos_layer = cfg.model.cos_layer
+        self.neck = cfg.model.neck
+        self.neck_feat = cfg.testing.neck_feat
         if self.model_name == "ViT-B-16":
             self.in_planes = 768
             self.in_planes_proj = 512
@@ -72,7 +71,7 @@ class build_transformer(nn.Module):
         self.num_classes = num_classes
         self.camera_num = camera_num
         self.view_num = view_num
-        self.sie_coe = cfg.MODEL.SIE_COE
+        self.sie_coe = cfg.model.sie_coe
 
         self.classifier = nn.Linear(self.in_planes, self.num_classes, bias=False)
         self.classifier.apply(weights_init_classifier)
@@ -89,12 +88,12 @@ class build_transformer(nn.Module):
         self.bottleneck_proj.apply(weights_init_kaiming)
 
         self.h_resolution = int(
-            (cfg.INPUT.SIZE_TRAIN[0] - 16) // cfg.MODEL.STRIDE_SIZE[0] + 1
+            (cfg.preprocessing.size_train[0] - 16) // cfg.model.stride_size[0] + 1
         )
         self.w_resolution = int(
-            (cfg.INPUT.SIZE_TRAIN[1] - 16) // cfg.MODEL.STRIDE_SIZE[1] + 1
+            (cfg.preprocessing.size_train[1] - 16) // cfg.model.stride_size[1] + 1
         )
-        self.vision_stride_size = cfg.MODEL.STRIDE_SIZE[0]
+        self.vision_stride_size = cfg.model.stride_size[0]
         clip_model = load_clip_to_cpu(
             self.model_name,
             self.h_resolution,
@@ -105,22 +104,22 @@ class build_transformer(nn.Module):
 
         self.image_encoder = clip_model.visual
 
-        if cfg.MODEL.SIE_CAMERA and cfg.MODEL.SIE_VIEW:
+        if cfg.model.sie_camera and cfg.model.sie_view:
             self.cv_embed = nn.Parameter(
                 torch.zeros(camera_num * view_num, self.in_planes)
             )
             trunc_normal_(self.cv_embed, std=0.02)
             print("camera number is : {}".format(camera_num))
-        elif cfg.MODEL.SIE_CAMERA:
+        elif cfg.model.sie_camera:
             self.cv_embed = nn.Parameter(torch.zeros(camera_num, self.in_planes))
             trunc_normal_(self.cv_embed, std=0.02)
             print("camera number is : {}".format(camera_num))
-        elif cfg.MODEL.SIE_VIEW:
+        elif cfg.model.sie_view:
             self.cv_embed = nn.Parameter(torch.zeros(view_num, self.in_planes))
             trunc_normal_(self.cv_embed, std=0.02)
             print("camera number is : {}".format(view_num))
 
-        dataset_name = cfg.DATASETS.NAMES
+        dataset_name = cfg.dataset.names
         self.prompt_learner = PromptLearner(
             num_classes, dataset_name, clip_model.dtype, clip_model.token_embedding
         )
@@ -225,7 +224,7 @@ def make_model(cfg, num_class, camera_num, view_num):
 
 
 def load_clip_to_cpu(backbone_name, h_resolution, w_resolution, vision_stride_size):
-    url = clip._MODELS[backbone_name]
+    url = MODELS[backbone_name]
     model_path = clip._download(url)
 
     try:
@@ -236,7 +235,7 @@ def load_clip_to_cpu(backbone_name, h_resolution, w_resolution, vision_stride_si
     except RuntimeError:
         state_dict = torch.load(model_path, map_location="cpu")
 
-    model = clip.build_model(
+    model = build_model(
         state_dict or model.state_dict(), h_resolution, w_resolution, vision_stride_size
     )
 

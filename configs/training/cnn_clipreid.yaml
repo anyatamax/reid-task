@@ -1,0 +1,95 @@
+# Training configuration
+
+solver:
+  # Random seed
+  seed: 1234
+  # Margin of triplet loss
+  margin: 0.3
+  # Stage 1 and Stage 2
+  stage1:
+    # Images per batch
+    ims_per_batch: 4
+    # Optimizer name
+    optimizer_name: "Adam"
+    # Base learning rate
+    base_lr: 0.00035
+    # Warmup learning rate initial value
+    warmup_lr_init: 0.00001
+    # Minimum learning rate
+    lr_min: 1e-6
+    # Warmup method
+    warmup_method: "linear"
+    # Weight decay
+    weight_decay: 1e-4
+    # Weight decay for bias parameters
+    weight_decay_bias: 1e-4
+    # Maximum number of epochs
+    max_epochs: 60
+    # Checkpoint period (save model every N epochs)
+    checkpoint_period: 60
+    # Warmup epochs
+    warmup_epochs: 5
+    # Cosine margin
+    cosine_margin: 0.5
+    # Cosine scale
+    cosine_scale: 30
+    # Momentum
+    momentum: 0.9
+    # warm up factor
+    warmup_factor: 0.01
+    warmup_iters: 500
+  stage2:
+    # Images per batch
+    ims_per_batch: 4
+    # Optimizer name
+    optimizer_name: "Adam"
+    # Base learning rate
+    base_lr: 0.00035
+    # Warmup method
+    warmup_method: "linear"
+    # Warmup iterations
+    warmup_iters: 10
+    # Warmup factor
+    warmup_factor: 0.01
+    # Weight decay
+    weight_decay: 0.0005
+    # Weight decay for bias parameters
+    weight_decay_bias: 0.0005
+    # Whether using larger learning rate for fc layer
+    large_fc_lr: false
+    # Maximum number of epochs
+    max_epochs: 120
+    # Checkpoint period (save model every N epochs)
+    checkpoint_period: 5
+    # Factor of learning bias
+    bias_lr_factor: 2
+    # Learning rate decay steps
+    steps: [40, 70]
+    # Learning rate decay gamma
+    gamma: 0.1
+    # Learning rate of SGD to learn the centers of center loss
+    center_lr: 0.5
+    # Balanced weight of center loss
+    center_loss_weight: 0.0005
+    # Momentum
+    momentum: 0.9
+    # Cosine margin
+    cosine_margin: 0.5
+    # Cosine scale
+    cosine_scale: 30
+    #  warm up epochs
+    warmup_epochs: 5
+    warmup_lr_init: 0.01
+    lr_min: 0.000016
+  # Log period (log training stats every N iterations)
+  log_period: 10
+  # Log period (log training stats every N iterations)
+  eval_period: 1
+
+# DataLoader configuration
+dataloader:
+  num_workers: 4
+  # Sampler for data loading
+  sampler: "softmax_triplet"
+  # Number of instance for one batch
+  num_instance: 4

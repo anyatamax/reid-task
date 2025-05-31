@@ -7,14 +7,16 @@ import numpy as np
 import torch
 import torch.multiprocessing as mp
 
-from config import cfg
 from datasets.data import CLIPReIDDataModule
 from model.model_pl import CLIPReIDModule
+from configs.constants import *
 
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor, EarlyStopping, ModelSummary, Timer
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.strategies import DDPStrategy
+import hydra
+from omegaconf import DictConfig, OmegaConf
 
 def set_seed(seed):
     torch.manual_seed(seed)
@@ -25,43 +27,17 @@ def set_seed(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = True
 
+@hydra.main(config_path="configs", config_name="config")
+def main(cfg: DictConfig):
+    print(OmegaConf.to_yaml(cfg))
 
-def main():
-    parser = argparse.ArgumentParser(description="ReID Baseline Training")
-    parser.add_argument(
-        "--config_file",
-        default="configs/person/vit_clipreid.yml",
-        help="path to config file",
-        type=str,
-    )
+    set_seed(cfg.training.solver.seed)
 
-    parser.add_argument(
-        "opts",
-        help="Modify config options using the command-line",
-        default=None,
-        nargs=argparse.REMAINDER,
-    )
-    parser.add_argument("--local_rank", default=0, type=int)
-    args = parser.parse_args()
-
-    if args.config_file != "":
-        cfg.merge_from_file(args.config_file)
-    cfg.merge_from_list(args.opts)
-    cfg.freeze()
-
-    set_seed(cfg.SOLVER.SEED)
-
-    output_dir = cfg.OUTPUT_DIR
+    output_dir = cfg.output_dir
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    print("Saving model in the path :{}".format(cfg.OUTPUT_DIR))
-
-    if args.config_file != "":
-        print("Loaded configuration file {}".format(args.config_file))
-        with open(args.config_file, "r") as cf:
-            config_str = "\n" + cf.read()
-            print("Config args: ", config_str)
+    print("Saving model in the path : {}".format(output_dir))
 
     data_module = CLIPReIDDataModule(cfg)
     data_module.setup()
@@ -79,17 +55,17 @@ def main():
     callbacks = [
         ModelCheckpoint(
             dirpath=output_dir,
-            filename=f"{cfg.MODEL.NAME}" + "-{epoch:02d}-{val_rank1:.4f}",
+            filename=f"{cfg.model.name}" + "-{epoch:02d}-{val_rank1:.4f}",
             monitor="val_rank1",
             mode="max",
-            save_top_k=1,
-            save_last=True,
+            save_top_k=SAVE_TOP_K,
+            save_last=SAVE_LAST,
         ),
         LearningRateMonitor(logging_interval="epoch"),
         EarlyStopping(
             monitor="val_rank1",
-            patience=10,
-            mode="max",
+            patience=EARLY_STOPPING_PATIENCE,
+            mode=EARLY_STOPPING_MODE,
             verbose=True,
         ),
         Timer()
@@ -97,11 +73,11 @@ def main():
     
     logger = TensorBoardLogger(
         save_dir=output_dir,
-        name="reid_logs",
+        name=cfg.logging.tesorboard_dir,
         default_hp_metric=False,
     )
     
-    if cfg.MODEL.DIST_TRAIN:
+    if DIST_TRAIN:
         strategy = DDPStrategy(
             process_group_backend="nccl",
             find_unused_parameters=False,
@@ -112,19 +88,19 @@ def main():
         strategy = "auto"
     
     trainer = pl.Trainer(
-        max_epochs=cfg.SOLVER.STAGE1.MAX_EPOCHS + cfg.SOLVER.STAGE2.MAX_EPOCHS,
-        accelerator="gpu",
-        devices="auto",
+        max_epochs=cfg.training.solver.stage1.max_epochs + cfg.training.solver.stage2.max_epochs,
+        accelerator=ACCELERATOR,
+        devices=DEVICES,
         strategy=strategy,
-        precision="16-mixed",
+        precision=PRECISION,
         callbacks=callbacks,
         logger=logger,
-        log_every_n_steps=10,
-        check_val_every_n_epoch=cfg.SOLVER.STAGE2.EVAL_PERIOD,
-        deterministic=True,
+        log_every_n_steps=cfg.training.solver.log_period,
+        check_val_every_n_epoch=cfg.training.solver.eval_period,
+        deterministic=DETERMINISTIC,
     )
     
-    if cfg.MODEL.DIST_TRAIN and mp.get_start_method(allow_none=True) != 'spawn':
+    if DIST_TRAIN and mp.get_start_method(allow_none=True) != 'spawn':
         mp.set_start_method('spawn', force=True)
     
     trainer.fit(model, data_module)

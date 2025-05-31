@@ -1,0 +1,19 @@
+defaults:
+  - preprocessing: cnn_clipreid
+  - model: cnn_clipreid
+  - training: cnn_clipreid
+  - dataset: market1501
+  - testing: cnn_clipreid
+  - logging: logging
+  - _self_
+
+# Output directory for logs and checkpoints
+output_dir: "model_chkp"
+
+# # Hydra configuration
+# hydra:
+#   run:
+#     dir: ${output_dir}
+#   sweep:
+#     dir: ${output_dir}
+#     subdir: ${hydra.job.num}

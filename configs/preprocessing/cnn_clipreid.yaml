@@ -1,0 +1,19 @@
+# -----------------------------------------------------------------------------
+# INPUT
+# -----------------------------------------------------------------------------
+# Size of the image during training
+size_train: [256, 128]
+# Size of the image during test
+size_test: [256, 128]
+# Random probability for image horizontal flip
+prob: 0.5
+# Random probability for random erasing
+re_prob: 0.5
+# Values to be used for image normalization
+pixel_mean: [0.485, 0.456, 0.406]
+# Values to be used for image normalization
+pixel_std: [0.229, 0.224, 0.225]
+# Value of padding size
+padding: 10
+re_mode: "pixel"
+re_max_count: 1

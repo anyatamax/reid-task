@@ -14,6 +14,7 @@ from .sampler import RandomIdentitySampler
 from .sampler_ddp import RandomIdentitySampler_DDP
 # from .vehicleid import VehicleID
 # from .veri import VeRi
+from configs.constants import DEVICE, DIST_TRAIN
 
 factory = {
     "market1501": Market1501,
@@ -48,40 +49,40 @@ class CLIPReIDDataModule(pl.LightningDataModule):
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
-        self.dataset_name = cfg.DATASETS.NAMES
-        self.root_dir = cfg.DATASETS.ROOT_DIR
-        self.batch_size_stage1 = cfg.SOLVER.STAGE1.IMS_PER_BATCH
-        self.batch_size_stage2 = cfg.SOLVER.STAGE2.IMS_PER_BATCH
-        self.test_batch_size = cfg.TEST.IMS_PER_BATCH
-        self.num_workers = cfg.DATALOADER.NUM_WORKERS
-        self.sampler = cfg.DATALOADER.SAMPLER
-        self.num_instance = cfg.DATALOADER.NUM_INSTANCE
+        self.dataset_name = cfg.dataset.names
+        self.root_dir = cfg.dataset.root_dir
+        self.batch_size_stage1 = cfg.training.solver.stage1.ims_per_batch
+        self.batch_size_stage2 = cfg.training.solver.stage2.ims_per_batch
+        self.test_batch_size = cfg.testing.ims_per_batch
+        self.num_workers = cfg.training.dataloader.num_workers
+        self.sampler = cfg.training.dataloader.sampler
+        self.num_instance = cfg.training.dataloader.num_instance
         
         self.train_transforms = T.Compose(
             [
-                T.Resize(cfg.INPUT.SIZE_TRAIN, interpolation=3),
-                T.RandomHorizontalFlip(p=cfg.INPUT.PROB),
-                T.Pad(cfg.INPUT.PADDING),
-                T.RandomCrop(cfg.INPUT.SIZE_TRAIN),
+                T.Resize(cfg.preprocessing.size_train, interpolation=3),
+                T.RandomHorizontalFlip(p=cfg.preprocessing.prob),
+                T.Pad(cfg.preprocessing.padding),
+                T.RandomCrop(cfg.preprocessing.size_train),
                 T.ToTensor(),
-                T.Normalize(mean=cfg.INPUT.PIXEL_MEAN, std=cfg.INPUT.PIXEL_STD),
+                T.Normalize(mean=cfg.preprocessing.pixel_mean, std=cfg.preprocessing.pixel_std),
                 RandomErasing(
-                    probability=cfg.INPUT.RE_PROB, mode="pixel", max_count=1, device="cpu"
+                    probability=cfg.preprocessing.re_prob, mode=cfg.preprocessing.re_mode, max_count=cfg.preprocessing.re_max_count, device=DEVICE
                 ),
             ]
         )
 
         self.val_transforms = T.Compose(
             [
-                T.Resize(cfg.INPUT.SIZE_TEST),
+                T.Resize(cfg.preprocessing.size_test),
                 T.ToTensor(),
-                T.Normalize(mean=cfg.INPUT.PIXEL_MEAN, std=cfg.INPUT.PIXEL_STD),
+                T.Normalize(mean=cfg.preprocessing.pixel_mean, std=cfg.preprocessing.pixel_std),
             ]
         )
         
     
     def setup(self, stage = None):
-        self.dataset = factory[self.cfg.DATASETS.NAMES](root=self.cfg.DATASETS.ROOT_DIR)
+        self.dataset = factory[self.dataset_name](root=self.root_dir)
         self.num_classes = self.dataset.num_train_pids
         self.cam_num = self.dataset.num_train_cams
         self.view_num = self.dataset.num_train_vids
@@ -104,7 +105,7 @@ class CLIPReIDDataModule(pl.LightningDataModule):
 
     def train_dataloader(self):
         if "triplet" in self.sampler:
-            if self.cfg.MODEL.DIST_TRAIN:
+            if DIST_TRAIN:
                 print("DIST_TRAIN START")
                 mini_batch_size = self.batch_size_stage2 // dist.get_world_size()
                 data_sampler = RandomIdentitySampler_DDP(

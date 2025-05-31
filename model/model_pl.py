@@ -35,7 +35,7 @@ class CLIPReIDModule(pl.LightningModule):
         self.loss_meter = AverageMeter()
         self.acc_meter = AverageMeter()
 
-        self.evaluator = R1_mAP_eval(num_query, max_rank=50, feat_norm=cfg.TEST.FEAT_NORM)
+        self.evaluator = R1_mAP_eval(num_query, max_rank=50, feat_norm=cfg.testing.feat_norm)
 
         self.stage = 1
         self.text_features = None
@@ -46,10 +46,10 @@ class CLIPReIDModule(pl.LightningModule):
         optimizer_1stage = make_optimizer_1stage(self.cfg, self.model)
         scheduler_1stage = create_scheduler(
             optimizer_1stage,
-            num_epochs=self.cfg.SOLVER.STAGE1.MAX_EPOCHS,
-            lr_min=self.cfg.SOLVER.STAGE1.LR_MIN,
-            warmup_lr_init=self.cfg.SOLVER.STAGE1.WARMUP_LR_INIT,
-            warmup_t=self.cfg.SOLVER.STAGE1.WARMUP_EPOCHS,
+            num_epochs=self.cfg.training.solver.stage1.max_epochs,
+            lr_min=self.cfg.training.solver.stage1.lr_min,
+            warmup_lr_init=self.cfg.training.solver.stage1.warmup_lr_init,
+            warmup_t=self.cfg.training.solver.stage1.warmup_epochs,
             noise_range=None,
         )
         scheduler_1stage = {
@@ -64,7 +64,7 @@ class CLIPReIDModule(pl.LightningModule):
         self.xent = SupConLoss(device=self.device)
         
         if self.stage == 1:
-            model_path = os.path.join(self.cfg.OUTPUT_DIR, self.cfg.MODEL.MODEL_CHKP_NAME_STAGE1)
+            model_path = os.path.join(self.cfg.output_dir, self.cfg.model.model_chkp_name_stage1)
             if not os.path.exists(model_path):
                 print("Not found checkpoint")
                 self.extract_image_features()
@@ -100,7 +100,7 @@ class CLIPReIDModule(pl.LightningModule):
             self.labels_list = torch.stack(labels, dim=0)
             self.image_features_list = torch.stack(image_features, dim=0)
             
-            self.batch_size = self.cfg.SOLVER.STAGE1.IMS_PER_BATCH
+            self.batch_size = self.cfg.training.solver.stage1.ims_per_batch
             self.num_image = self.labels_list.shape[0]
             self.i_ter = self.num_image // self.batch_size
         
@@ -115,11 +115,11 @@ class CLIPReIDModule(pl.LightningModule):
         )
         scheduler_2stage = WarmupMultiStepLR(
             optimizer_2stage,
-            self.cfg.SOLVER.STAGE2.STEPS,
-            self.cfg.SOLVER.STAGE2.GAMMA,
-            self.cfg.SOLVER.STAGE2.WARMUP_FACTOR,
-            self.cfg.SOLVER.STAGE2.WARMUP_ITERS,
-            self.cfg.SOLVER.STAGE2.WARMUP_METHOD,
+            self.cfg.training.solver.stage2.steps,
+            self.cfg.training.solver.stage2.gamma,
+            self.cfg.training.solver.stage2.warmup_factor,
+            self.cfg.training.solver.stage2.warmup_iters,
+            self.cfg.training.solver.stage2.warmup_method,
         )
         scheduler_2stage = {
             'scheduler': scheduler_2stage,
@@ -131,7 +131,7 @@ class CLIPReIDModule(pl.LightningModule):
         self.lr_schedulers()[1] = scheduler_2stage
         
         text_features = []
-        batch = self.cfg.SOLVER.STAGE2.IMS_PER_BATCH
+        batch = self.cfg.training.solver.stage2.ims_per_batch
         i_ter = self.num_classes // batch
         left = self.num_classes - batch * (self.num_classes // batch)
         if left != 0:
@@ -204,12 +204,12 @@ class CLIPReIDModule(pl.LightningModule):
         target = vid.to(self.device)
         img = img.to(self.device)
         
-        if self.cfg.MODEL.SIE_CAMERA:
+        if self.cfg.model.sie_camera:
             target_cam = target_cam.to(self.device)
         else:
             target_cam = None
             
-        if self.cfg.MODEL.SIE_VIEW:
+        if self.cfg.model.sie_view:
             target_view = target_view.to(self.device)
         else:
             target_view = None
@@ -224,9 +224,9 @@ class CLIPReIDModule(pl.LightningModule):
         self.manual_backward(loss)
         optimizer.step()
         
-        if "center" in self.cfg.MODEL.METRIC_LOSS_TYPE:
+        if "center" in self.cfg.model.metric_loss_type:
             for param in self.center_criterion.parameters():
-                param.grad.data *= (1.0 / self.cfg.SOLVER.CENTER_LOSS_WEIGHT)
+                param.grad.data *= (1.0 / self.cfg.training.solver.stage2.center_loss_weight)
             optimizer_center.step()
         
         acc = (logits.max(1)[1] == target).float().mean()
@@ -266,11 +266,11 @@ class CLIPReIDModule(pl.LightningModule):
             self.trainer.fit_loop.epoch_loop.max_steps = len(self.trainer.train_dataloader)
 
     def on_train_epoch_end(self):
-        if self.stage == 1 and self.current_epoch >= self.cfg.SOLVER.STAGE1.MAX_EPOCHS - 1:
+        if self.stage == 1 and self.current_epoch >= self.cfg.training.solver.stage1.MAX_EPOCHS - 1:
             torch.save(
                 self.model.state_dict(),
                 os.path.join(
-                    os.path.join(self.cfg.OUTPUT_DIR, self.cfg.MODEL.MODEL_CHKP_NAME_STAGE1)
+                    os.path.join(self.cfg.output_dir, self.cfg.model.model_chkp_name_stage1)
                 ),
             )
             self.prepare_stage2()
@@ -300,12 +300,12 @@ class CLIPReIDModule(pl.LightningModule):
             with torch.no_grad():
                 img = img.to(self.device)
                 
-                if self.cfg.MODEL.SIE_CAMERA:
+                if self.cfg.model.sie_camera:
                     camids = camids.to(self.device)
                 else:
                     camids = None
                     
-                if self.cfg.MODEL.SIE_VIEW:
+                if self.cfg.model.sie_view:
                     target_view = target_view.to(self.device)
                 else:
                     target_view = None

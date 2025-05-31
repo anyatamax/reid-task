@@ -7,6 +7,7 @@ import numpy as np
 import torch
 import torch.distributed as dist
 from torch.utils.data.sampler import Sampler
+from configs.constants import DEVICE
 
 _LOCAL_PROCESS_GROUP = None
 
@@ -25,7 +26,7 @@ def _get_global_gloo_group():
 def _serialize_to_tensor(data, group):
     backend = dist.get_backend(group)
     assert backend in ["gloo", "nccl"]
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device(DEVICE)
 
     buffer = pickle.dumps(data)
     if len(buffer) > 1024**3:
