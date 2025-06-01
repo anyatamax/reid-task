@@ -5,4 +5,4 @@
 names: 'market1501'
   
 # Root directory where datasets should be used (and downloaded if not found)
-root_dir: '/home/maksimovaam/reid-task'
+root_dir: '/home/maksimovaam/reid-task/data'
