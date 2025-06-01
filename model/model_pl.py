@@ -15,29 +15,22 @@ from solver.scheduler_factory import create_scheduler
 from utils.meter import AverageMeter
 
 
-class CLIPReIDModule(pl.LightningModule):
-    def __init__(self, cfg, num_classes, camera_num, view_num, num_query):
+class CLIPReIDModuleStage1(pl.LightningModule):
+    def __init__(self, cfg, num_classes, camera_num, view_num):
         super().__init__()
         self.save_hyperparameters()
         self.cfg = cfg
         self.num_classes = num_classes
         self.camera_num = camera_num
         self.view_num = view_num
-        self.num_query = num_query
         
         self.model = make_model(
-            cfg, num_class=num_classes, camera_num=camera_num, view_num=view_num
+            cfg, num_class=self.num_classes, camera_num=self.camera_num, view_num=self.view_num
         )
         for n, p in self.model.named_parameters():
             print(n, p.device, p.requires_grad)
         
-        self.loss_fn, self.center_criterion = make_loss(cfg, num_classes=num_classes)
         self.loss_meter = AverageMeter()
-        self.acc_meter = AverageMeter()
-
-        self.evaluator = R1_mAP_eval(num_query, max_rank=50, feat_norm=cfg.testing.feat_norm)
-
-        self.stage = 1
         self.text_features = None
         
         self.automatic_optimization = False
@@ -58,27 +51,12 @@ class CLIPReIDModule(pl.LightningModule):
             'frequency': 1
         }
         
-        return [optimizer_1stage, optimizer_1stage, optimizer_1stage], [scheduler_1stage, scheduler_1stage]
+        return [optimizer_1stage], [scheduler_1stage]
     
     def on_train_start(self):
         self.xent = SupConLoss(device=self.device)
         
-        if self.stage == 1:
-            model_path = os.path.join(self.cfg.output_dir, self.cfg.model.model_chkp_name_stage1)
-            if not os.path.exists(model_path):
-                print("Not found checkpoint")
-                self.extract_image_features()
-            else:
-                print("Loading from checkpoint {}".format(model_path))
-                state_dict = torch.load(model_path, weights_only=True)
-                new_state_dict = {}
-                for k, v in state_dict.items():
-                    name = k.replace("module.", "") if k.startswith("module.") else k
-                    new_state_dict[name] = v
-                self.model.load_state_dict(new_state_dict, strict=False)
-                print("Successfully loaded checkpoint with 'module.' prefix handling")
-                
-                self.stage = 2
+        self.extract_image_features()
     
     def extract_image_features(self):
         image_features = []
@@ -109,55 +87,7 @@ class CLIPReIDModule(pl.LightningModule):
         self.model.train()
         del labels, image_features
     
-    def prepare_stage2(self):
-        optimizer_2stage, optimizer_center_2stage = make_optimizer_2stage(
-            self.cfg, self.model, self.center_criterion
-        )
-        scheduler_2stage = WarmupMultiStepLR(
-            optimizer_2stage,
-            self.cfg.training.solver.stage2.steps,
-            self.cfg.training.solver.stage2.gamma,
-            self.cfg.training.solver.stage2.warmup_factor,
-            self.cfg.training.solver.stage2.warmup_iters,
-            self.cfg.training.solver.stage2.warmup_method,
-        )
-        scheduler_2stage = {
-            'scheduler': scheduler_2stage,
-            'interval': 'epoch',
-            'frequency': 1
-        }
-        self.optimizers()[1] = optimizer_2stage
-        self.optimizers()[1] = optimizer_center_2stage
-        self.lr_schedulers()[1] = scheduler_2stage
-        
-        text_features = []
-        batch = self.cfg.training.solver.stage2.ims_per_batch
-        i_ter = self.num_classes // batch
-        left = self.num_classes - batch * (self.num_classes // batch)
-        if left != 0:
-            i_ter = i_ter + 1
-        
-        with torch.no_grad():
-            for i in range(i_ter):
-                if i + 1 != i_ter:
-                    l_list = torch.arange(i * batch, (i + 1) * batch)
-                else:
-                    l_list = torch.arange(i * batch, self.num_classes)
-                with amp.autocast(self.device.type, enabled=True):
-                    text_feature = self.model(label=l_list.to(self.device), get_text=True)
-                text_features.append(text_feature.cpu())
-            
-            self.text_features = torch.cat(text_features, 0).to(self.device)
-        
-        self.stage = 2
-    
     def training_step(self, batch, batch_idx):
-        if self.stage == 1:
-            return self.training_step_stage1(batch, batch_idx)
-        else:
-            return self.training_step_stage2(batch, batch_idx)
-    
-    def training_step_stage1(self, batch, batch_idx):
         optimizer = self.optimizers()[0]
         optimizer.zero_grad()
 
@@ -192,9 +122,101 @@ class CLIPReIDModule(pl.LightningModule):
         
         return loss
     
-    def training_step_stage2(self, batch, batch_idx):
-        optimizer = self.optimizers()[1]
-        optimizer_center = self.optimizers()[2]
+    def on_train_epoch_start(self):
+        self.loss_meter.reset()
+        self.model.train()
+        self.iter_list = torch.randperm(self.num_image)
+        self.trainer.fit_loop.epoch_loop.max_steps = self.i_ter
+
+    def on_train_epoch_end(self):
+        if self.current_epoch >= self.cfg.training.solver.stage1.MAX_EPOCHS - 1:
+            torch.save(
+                self.model.state_dict(),
+                os.path.join(
+                    os.path.join(self.cfg.output_dir, self.cfg.model.model_chkp_name_stage1)
+                ),
+            )
+        scheduler_stage1 = self.lr_schedulers()[0]
+        self.log(
+            "base_lr_stage1",
+            scheduler_stage1._get_lr(self.current_epoch)[0],
+            on_epoch=True,
+            logger=True,
+        )
+        scheduler_stage1.step(self.current_epoch + 1)
+    
+    def validation_step(self, batch, batch_idx):
+        pass
+
+
+class CLIPReIDModuleStage2(pl.LightningModule):
+    def __init__(self, cfg, model, num_classes, num_query):
+        super().__init__()
+        self.save_hyperparameters()
+        self.cfg = cfg
+        self.num_classes = num_classes
+        self.num_query = num_query
+        
+        self.model = model
+        
+        self.loss_fn, self.center_criterion = make_loss(cfg, num_classes=self.num_classes)
+        self.loss_meter = AverageMeter()
+        self.acc_meter = AverageMeter()
+
+        self.evaluator = R1_mAP_eval(num_query, max_rank=50, feat_norm=cfg.testing.feat_norm)
+        self.text_features = None
+        
+        self.automatic_optimization = False
+    
+    def configure_optimizers(self):
+        optimizer_2stage, optimizer_center_2stage = make_optimizer_2stage(
+            self.cfg, self.model, self.center_criterion
+        )
+        scheduler_2stage = WarmupMultiStepLR(
+            optimizer_2stage,
+            self.cfg.training.solver.stage2.steps,
+            self.cfg.training.solver.stage2.gamma,
+            self.cfg.training.solver.stage2.warmup_factor,
+            self.cfg.training.solver.stage2.warmup_iters,
+            self.cfg.training.solver.stage2.warmup_method,
+        )
+        scheduler_2stage = {
+            'scheduler': scheduler_2stage,
+            'interval': 'epoch',
+            'frequency': 1
+        }
+        
+        return [optimizer_2stage, optimizer_center_2stage], [scheduler_2stage]
+    
+    def on_train_start(self):
+        for n, p in self.model.named_parameters():
+            print(n, p.device, p.requires_grad)
+        
+        self.extract_text_features()
+    
+    def extract_text_features(self):
+        text_features = []
+        batch = self.cfg.training.solver.stage2.ims_per_batch
+        i_ter = self.num_classes // batch
+        left = self.num_classes - batch * (self.num_classes // batch)
+        if left != 0:
+            i_ter = i_ter + 1
+        
+        with torch.no_grad():
+            for i in range(i_ter):
+                if i + 1 != i_ter:
+                    l_list = torch.arange(i * batch, (i + 1) * batch)
+                else:
+                    l_list = torch.arange(i * batch, self.num_classes)
+                with amp.autocast(self.device.type, enabled=True):
+                    text_feature = self.model(label=l_list.to(self.device), get_text=True)
+                text_features.append(text_feature.cpu())
+            
+            self.text_features = torch.cat(text_features, 0).to(self.device)
+    
+    def training_step(self, batch, batch_idx):
+        optimizer = self.optimizers()[0]
+        optimizer_center = self.optimizers()[1]
         
         optimizer.zero_grad()
         optimizer_center.zero_grad()
@@ -253,100 +275,72 @@ class CLIPReIDModule(pl.LightningModule):
         return loss
     
     def on_train_epoch_start(self):
-        if self.stage == 1:
-            self.loss_meter.reset()
-            self.model.train()
-            self.iter_list = torch.randperm(self.num_image)
-            self.trainer.fit_loop.epoch_loop.max_steps = self.i_ter
-
-        else:
-            self.loss_meter.reset()
-            self.acc_meter.reset()
-            self.model.train()
-            self.trainer.fit_loop.epoch_loop.max_steps = len(self.trainer.train_dataloader)
+        self.loss_meter.reset()
+        self.acc_meter.reset()
+        self.model.train()
 
     def on_train_epoch_end(self):
-        if self.stage == 1 and self.current_epoch >= self.cfg.training.solver.stage1.MAX_EPOCHS - 1:
-            torch.save(
-                self.model.state_dict(),
-                os.path.join(
-                    os.path.join(self.cfg.output_dir, self.cfg.model.model_chkp_name_stage1)
-                ),
-            )
-            self.prepare_stage2()
-        elif self.stage == 1:
-            scheduler_stage1 = self.lr_schedulers()[0]
-            self.log(
-                "base_lr_stage1",
-                scheduler_stage1._get_lr(self.current_epoch)[0],
-                on_epoch=True,
-                logger=True,
-            )
-            scheduler_stage1.step(self.current_epoch + 1)
-        else:
-            scheduler_stage2 = self.lr_schedulers()[1]
-            self.log(
-                "base_lr_stage2",
-                scheduler_stage2._get_lr(self.current_epoch)[0],
-                on_epoch=True,
-                logger=True,
-            )
-            scheduler_stage2.step()
+        scheduler_stage2 = self.lr_schedulers()[0]
+        self.log(
+            "base_lr_stage2",
+            scheduler_stage2._get_lr(self.current_epoch)[0],
+            on_epoch=True,
+            logger=True,
+        )
+        scheduler_stage2.step()
     
     def validation_step(self, batch, batch_idx):
-        if self.stage == 2:
-            img, pid, camid, camids, target_view, _ = batch
+        img, pid, camid, camids, target_view, _ = batch
+        
+        with torch.no_grad():
+            img = img.to(self.device)
             
-            with torch.no_grad():
-                img = img.to(self.device)
+            if self.cfg.model.sie_camera:
+                camids = camids.to(self.device)
+            else:
+                camids = None
                 
-                if self.cfg.model.sie_camera:
-                    camids = camids.to(self.device)
-                else:
-                    camids = None
-                    
-                if self.cfg.model.sie_view:
-                    target_view = target_view.to(self.device)
-                else:
-                    target_view = None
-                    
-                feat = self.model(img, cam_label=camids, view_label=target_view)
-                self.evaluator.update((feat, pid, camid))
+            if self.cfg.model.sie_view:
+                target_view = target_view.to(self.device)
+            else:
+                target_view = None
+                
+            feat = self.model(img, cam_label=camids, view_label=target_view)
+            self.evaluator.update((feat, pid, camid))
     
     def on_validation_epoch_end(self):
-        if self.stage == 2:
-            cmc, mAP, _, _, _, _, _ = self.evaluator.compute()
-            
-            self.log(
-                "val_mAP",
-                mAP,
-                prog_bar=True,
-                logger=True,
-                on_epoch=True,
-            )
-            self.log(
-                "val_rank1",
-                cmc[0],
-                prog_bar=True,
-                logger=True,
-                on_epoch=True,
-            )
-            self.log(
-                "val_rank5",
-                cmc[4],
-                prog_bar=True,
-                logger=True,
-                on_epoch=True,
-            )
-            self.log(
-                "val_rank10",
-                cmc[9],
-                prog_bar=True,
-                logger=True,
-                on_epoch=True,
-            )
-            
-            self.evaluator.reset()
+        cmc, mAP, _, _, _, _, _ = self.evaluator.compute()
+        
+        self.log(
+            "val_mAP",
+            mAP,
+            prog_bar=True,
+            logger=True,
+            on_epoch=True,
+        )
+        self.log(
+            "val_rank1",
+            cmc[0],
+            prog_bar=True,
+            logger=True,
+            on_epoch=True,
+        )
+        self.log(
+            "val_rank5",
+            cmc[4],
+            prog_bar=True,
+            logger=True,
+            on_epoch=True,
+        )
+        self.log(
+            "val_rank10",
+            cmc[9],
+            prog_bar=True,
+            logger=True,
+            on_epoch=True,
+        )
+        
+        self.evaluator.reset()
     
     # def on_test_epoch_start(self):
     #     self.evaluator.reset()
@@ -390,4 +384,3 @@ class CLIPReIDModule(pl.LightningModule):
     #     self.print(f"Test Results - Rank-1: {cmc[0]:.1%}")
     #     self.print(f"Test Results - Rank-5: {cmc[4]:.1%}")
     #     self.print(f"Test Results - mAP: {mAP:.1%}")
-
