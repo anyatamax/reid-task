@@ -3,6 +3,15 @@
 # -----------------------------------------------------------------------------
 # List of the dataset names for training, as present in paths_catalog.py
 names: 'market1501'
+
+# Name dir
+dataset_dir: "Market-1501-v15.09.15"
+
+# Data dir
+data_dir: "data"
   
 # Root directory where datasets should be used (and downloaded if not found)
-root_dir: '/home/maksimovaam/reid-task/data'
+root_dir: '/home/maksimovaam/reid-task/'
+
+# The way to download data
+from_dvc: True

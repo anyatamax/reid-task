@@ -136,4 +136,6 @@ mlruns/
 /outputs
 
 # model chkp and tensorboard
-/model_chkp
+model_chkp/*
+!model_chkp/*.dvc
+model_logs/

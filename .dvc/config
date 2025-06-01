@@ -2,3 +2,5 @@
     remote = data
 ['remote "data"']
     url = /home/maksimovaam/data
+['remote "models"']
+    url = /home/maksimovaam/models

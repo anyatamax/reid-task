@@ -51,6 +51,8 @@ class CLIPReIDDataModuleStage1(pl.LightningDataModule):
         self.cfg = cfg
         self.dataset_name = cfg.dataset.names
         self.root_dir = cfg.dataset.root_dir
+        self.data_dir = cfg.dataset.data_dir
+        self.dataset_dir = cfg.dataset.dataset_dir
         self.batch_size_stage1 = cfg.training.solver.stage1.ims_per_batch
         self.test_batch_size = cfg.testing.ims_per_batch
         self.num_workers = cfg.training.dataloader.num_workers
@@ -81,7 +83,7 @@ class CLIPReIDDataModuleStage1(pl.LightningDataModule):
         
     
     def setup(self, stage = None):
-        self.dataset = factory[self.dataset_name](root=self.root_dir)
+        self.dataset = factory[self.dataset_name](root=self.root_dir, data_dir=self.data_dir, datast_dir=self.dataset_dir)
         self.num_classes = self.dataset.num_train_pids
         self.cam_num = self.dataset.num_train_cams
         self.view_num = self.dataset.num_train_vids

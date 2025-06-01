@@ -10,6 +10,8 @@ import torch.multiprocessing as mp
 from datasets.data import CLIPReIDDataModuleStage1, CLIPReIDDataModuleStage2
 from model.model_pl import CLIPReIDModuleStage1, CLIPReIDModuleStage2
 from configs.constants import *
+from utils.dvc_utils import download_dvc_data
+from utils.download_data import download_data
 
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor, EarlyStopping, ModelSummary, Timer
@@ -33,11 +35,29 @@ def main(cfg: DictConfig):
 
     set_seed(cfg.training.solver.seed)
 
-    output_dir = cfg.output_dir
-    if output_dir and not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    print("Saving model in the path : {}".format(output_dir))
+    output_model_dir = cfg.output_dir
+    if output_model_dir and not os.path.exists(output_model_dir):
+        os.makedirs(output_model_dir)
+    print("Saving model in the path : {}".format(output_model_dir))
+        
+    output_log_dir = cfg.ououtput_log_dirtput_dir
+    if output_log_dir and not os.path.exists(output_log_dir):
+        os.makedirs(output_log_dir)
+    print("Logging in the path : {}".format(output_log_dir))
+    
+    # Download data
+    data_path =  os.path.join(cfg.dataset.root_dir, cfg.dataset.data_dir, cfg.dataset.dataset_dir)
+    if os.path.exists(data_path):
+        print("Dataset already downloaded")
+    else:
+        if cfg.dataset.from_dvc:
+            print("Downloading data from DVC remote...")
+            download_success = download_dvc_data(data_dir=cfg.dataset.data_dir, dataset_name=cfg.dataset.dataset_dir + ".dvc")
+            if not download_success:
+                download_data()
+        else:
+            print("Downloading data from Google Disk...")
+            download_data()
     
     if DIST_TRAIN:
         strategy = DDPStrategy(
@@ -67,7 +87,7 @@ def main(cfg: DictConfig):
 
     callbacks_stage1 = [
         ModelCheckpoint(
-            dirpath=output_dir,
+            dirpath=output_model_dir,
             filename=f"{cfg.model.name}" + "_stage1" + "-{epoch:02d}-{train_loss_stage1:.4f}",
             monitor="train_loss_stage1",
             mode="min",
@@ -79,7 +99,7 @@ def main(cfg: DictConfig):
     ]
     
     logger_stage1 = TensorBoardLogger(
-        save_dir=output_dir,
+        save_dir=output_log_dir,
         name=cfg.logging.tesorboard_dir,
         default_hp_metric=False,
     )
@@ -127,7 +147,7 @@ def main(cfg: DictConfig):
 
     callbacks_stage2 = [
         ModelCheckpoint(
-            dirpath=output_dir,
+            dirpath=output_model_dir,
             filename=f"{cfg.model.name}" + "_stage2" + "-{epoch:02d}-{train_acc_stage2:.4f}",
             monitor="train_acc_stage2",
             mode="max",
@@ -145,7 +165,7 @@ def main(cfg: DictConfig):
     ]
     
     logger_stage2 = TensorBoardLogger(
-        save_dir=output_dir,
+        save_dir=output_log_dir,
         name=cfg.logging.tesorboard_dir,
         default_hp_metric=False,
     )
