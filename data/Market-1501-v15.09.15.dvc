@@ -1,0 +1,6 @@
+outs:
+- md5: 0d61c823b34177c53e9e2161db8257b3.dir
+  size: 145885626
+  nfiles: 68036
+  hash: md5
+  path: Market-1501-v15.09.15
