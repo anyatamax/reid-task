@@ -24,7 +24,7 @@ solver:
     # Weight decay for bias parameters
     weight_decay_bias: 1e-4
     # Maximum number of epochs
-    max_epochs: 60
+    max_epochs: 2
     # Checkpoint period (save model every N epochs)
     checkpoint_period: 60
     # Warmup epochs

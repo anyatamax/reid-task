@@ -60,11 +60,8 @@ class CLIPReIDModuleStage1(pl.LightningModule):
     
     def extract_image_features(self):
         image_features = []
-        labels = []
-
-        dataloader = self.trainer.datamodule.stage1_dataloader()
-        self.len_dataloader_stage1 = len(dataloader)        
-        
+        labels = []        
+        dataloader = self.trainer.datamodule.train_dataloader()  
         with torch.no_grad():
             for _, (img, vid, _, _) in enumerate(dataloader):
                 img = img.to(self.device)
@@ -81,14 +78,16 @@ class CLIPReIDModuleStage1(pl.LightningModule):
             self.batch_size = self.cfg.training.solver.stage1.ims_per_batch
             self.num_image = self.labels_list.shape[0]
             self.i_ter = self.num_image // self.batch_size
+            print("Iter first stage: ", self.i_ter)
         
         self.img_shape = img.shape
 
         self.model.train()
         del labels, image_features
+        torch.cuda.empty_cache()
     
     def training_step(self, batch, batch_idx):
-        optimizer = self.optimizers()[0]
+        optimizer = self.optimizers()
         optimizer.zero_grad()
 
         if batch_idx != self.i_ter:
@@ -126,17 +125,17 @@ class CLIPReIDModuleStage1(pl.LightningModule):
         self.loss_meter.reset()
         self.model.train()
         self.iter_list = torch.randperm(self.num_image)
-        self.trainer.fit_loop.epoch_loop.max_steps = self.i_ter
+        # self.trainer.fit_loop.epoch_loop.max_steps = self.i_ter
 
     def on_train_epoch_end(self):
-        if self.current_epoch >= self.cfg.training.solver.stage1.MAX_EPOCHS - 1:
+        if self.current_epoch >= self.cfg.training.solver.stage1.max_epochs - 1:
             torch.save(
                 self.model.state_dict(),
                 os.path.join(
                     os.path.join(self.cfg.output_dir, self.cfg.model.model_chkp_name_stage1)
                 ),
             )
-        scheduler_stage1 = self.lr_schedulers()[0]
+        scheduler_stage1 = self.lr_schedulers()
         self.log(
             "base_lr_stage1",
             scheduler_stage1._get_lr(self.current_epoch)[0],
@@ -164,6 +163,7 @@ class CLIPReIDModuleStage2(pl.LightningModule):
         self.acc_meter = AverageMeter()
 
         self.evaluator = R1_mAP_eval(num_query, max_rank=50, feat_norm=cfg.testing.feat_norm)
+        self.evaluator.reset()
         self.text_features = None
         
         self.automatic_optimization = False
@@ -213,10 +213,10 @@ class CLIPReIDModuleStage2(pl.LightningModule):
                 text_features.append(text_feature.cpu())
             
             self.text_features = torch.cat(text_features, 0).to(self.device)
+        torch.cuda.empty_cache()
     
     def training_step(self, batch, batch_idx):
-        optimizer = self.optimizers()[0]
-        optimizer_center = self.optimizers()[1]
+        optimizer, optimizer_center = self.optimizers()
         
         optimizer.zero_grad()
         optimizer_center.zero_grad()
@@ -280,7 +280,7 @@ class CLIPReIDModuleStage2(pl.LightningModule):
         self.model.train()
 
     def on_train_epoch_end(self):
-        scheduler_stage2 = self.lr_schedulers()[0]
+        scheduler_stage2 = self.lr_schedulers()
         self.log(
             "base_lr_stage2",
             scheduler_stage2._get_lr(self.current_epoch)[0],
@@ -341,6 +341,7 @@ class CLIPReIDModuleStage2(pl.LightningModule):
         )
         
         self.evaluator.reset()
+        torch.cuda.empty_cache()
     
     # def on_test_epoch_start(self):
     #     self.evaluator.reset()

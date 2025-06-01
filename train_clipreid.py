@@ -68,7 +68,7 @@ def main(cfg: DictConfig):
     callbacks_stage1 = [
         ModelCheckpoint(
             dirpath=output_dir,
-            filename=f"{cfg.model.name}" + "_stage1_" + "-{epoch:02d}-{val_rank1:.4f}",
+            filename=f"{cfg.model.name}" + "_stage1" + "-{epoch:02d}-{train_loss_stage1:.4f}",
             monitor="train_loss_stage1",
             mode="min",
             save_top_k=SAVE_TOP_K,
@@ -93,7 +93,7 @@ def main(cfg: DictConfig):
         callbacks=callbacks_stage1,
         logger=logger_stage1,
         log_every_n_steps=cfg.training.solver.log_period,
-        check_val_every_n_epoch=cfg.training.solver.eval_period,
+        check_val_every_n_epoch=cfg.training.solver.stage1.max_epochs + 1,
         deterministic=DETERMINISTIC,
     )
     
@@ -128,7 +128,7 @@ def main(cfg: DictConfig):
     callbacks_stage2 = [
         ModelCheckpoint(
             dirpath=output_dir,
-            filename=f"{cfg.model.name}" + "_stage2_" + "-{epoch:02d}-{val_rank1:.4f}",
+            filename=f"{cfg.model.name}" + "_stage2" + "-{epoch:02d}-{train_acc_stage2:.4f}",
             monitor="train_acc_stage2",
             mode="max",
             save_top_k=SAVE_TOP_K,
@@ -161,6 +161,7 @@ def main(cfg: DictConfig):
         log_every_n_steps=cfg.training.solver.log_period,
         check_val_every_n_epoch=cfg.training.solver.eval_period,
         deterministic=DETERMINISTIC,
+        num_sanity_val_steps=0,
     )
     
     trainer_stage2.fit(model_stage2, data_module_stage2)

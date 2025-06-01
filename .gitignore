@@ -131,3 +131,9 @@ dmypy.json
 # custom
 /src
 mlruns/
+
+# hydra output
+/outputs
+
+# model chkp and tensorboard
+/model_chkp

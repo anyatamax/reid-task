@@ -92,16 +92,6 @@ class CLIPReIDDataModuleStage1(pl.LightningDataModule):
         self.val_set = ImageDataset(self.dataset.query + self.dataset.gallery, self.val_transforms)
 
 
-    def stage1_dataloader(self):
-        return DataLoader(
-            self.train_set_normal,
-            batch_size=self.batch_size_stage1,
-            shuffle=True,
-            num_workers=self.num_workers,
-            collate_fn=train_collate_fn,
-        )
-
-
     def train_dataloader(self):
         return DataLoader(
             self.train_set_normal,
