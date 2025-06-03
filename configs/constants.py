@@ -7,7 +7,7 @@ PRECISION = "16-mixed"
 LOG_EVERY_N_STEPS = 10
 
 # Early stopping constants
-EARLY_STOPPING_PATIENCE = 10 
+EARLY_STOPPING_PATIENCE = 10
 EARLY_STOPPING_MODE = "max"
 
 # Model checkpoint constants
@@ -32,4 +32,6 @@ MODELS = {
     "ViT-B-16": "https://openaipublic.azureedge.net/clip/models/5806e77cd80f8b59890b7e101eabd078d9fb84e6937f9e85e4ecb61988df416f/ViT-B-16.pt",
 }
 
-PATH_TO_BPE = "/home/maksimovaam/reid-task/data/additional_files/bpe_simple_vocab_16e6.txt.gz"
+PATH_TO_BPE = (
+    "/home/maksimovaam/reid-task/data/additional_files/bpe_simple_vocab_16e6.txt.gz"
+)

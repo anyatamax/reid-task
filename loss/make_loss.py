@@ -7,10 +7,11 @@
 import torch
 import torch.nn.functional as F
 
+from configs.constants import DEVICE
+
 from .center_loss import CenterLoss
 from .softmax_loss import CrossEntropyLabelSmooth
 from .triplet_loss import TripletLoss
-from configs.constants import DEVICE
 
 
 def make_loss(cfg, num_classes):  # modified by gu
@@ -25,7 +26,9 @@ def make_loss(cfg, num_classes):  # modified by gu
             print("using soft triplet loss for training")
         else:
             triplet = TripletLoss(cfg.training.solver.margin)  # triplet loss
-            print("using triplet loss with margin:{}".format(cfg.training.solver.margin))
+            print(
+                "using triplet loss with margin:{}".format(cfg.training.solver.margin)
+            )
     else:
         print(
             "expected METRIC_LOSS_TYPE should be triplet"

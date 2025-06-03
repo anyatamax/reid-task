@@ -1,50 +1,71 @@
 from pathlib import Path
-import torch
 
+import hydra
+import pytorch_lightning as pl
+import torch
+from omegaconf import DictConfig, OmegaConf
+
+from configs.constants import ACCELERATOR, DEVICES, PRECISION
 from datasets.data import CLIPReIDDataModuleStage1
 from model.model_pl import CLIPReIDModuleStage1
+from utils.download_data import download_additional_files, download_data
 from utils.dvc_utils import download_dvc_data
-from utils.download_data import download_data, download_additional_files
-from configs.constants import *
 
-import pytorch_lightning as pl
-import hydra
-from omegaconf import DictConfig, OmegaConf
-from pytorch_lightning.loggers import MLFlowLogger
 
-def download(root_dir, data_dir, dataset_dir, download_dvc, download_from_disk, from_dvc):
+def download(
+    root_dir, data_dir, dataset_dir, download_dvc, download_from_disk, from_dvc
+):
     data_path = Path(root_dir) / data_dir / dataset_dir
     if data_path.exists():
         print(f"{dataset_dir} already downloaded")
     else:
         if from_dvc:
             print(f"Downloading {dataset_dir} from DVC remote...")
-            download_success = download_dvc(data_dir=data_dir, dataset_name=dataset_dir + ".dvc")
+            download_success = download_dvc(
+                data_dir=data_dir, dataset_name=dataset_dir + ".dvc"
+            )
             if not download_success:
                 download_from_disk()
         else:
             print(f"Downloading {dataset_dir} from Google Disk...")
             download_from_disk()
 
+
 @hydra.main(config_path="configs", config_name="config", version_base=None)
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg))
-    
+
     model_path = Path(cfg.output_dir) / cfg.testing.weight
     if not model_path.exists():
-        print("Not found result model. Need to train in train_clipreid.py or download from dvc")
+        print(
+            "Not found result model. Need to train in train_clipreid.py or download from dvc"
+        )
         return
-    
+
     # Download data
     # Download data
-    download(cfg.dataset.root_dir, cfg.dataset.data_dir, cfg.dataset.dataset_dir, download_dvc_data, download_data, cfg.dataset.from_dvc)
-    
+    download(
+        cfg.dataset.root_dir,
+        cfg.dataset.data_dir,
+        cfg.dataset.dataset_dir,
+        download_dvc_data,
+        download_data,
+        cfg.dataset.from_dvc,
+    )
+
     # Download additional files
-    download(cfg.dataset.root_dir, cfg.dataset.data_dir, cfg.dataset.files_dir, download_dvc_data, download_additional_files, cfg.dataset.from_dvc)
-            
+    download(
+        cfg.dataset.root_dir,
+        cfg.dataset.data_dir,
+        cfg.dataset.files_dir,
+        download_dvc_data,
+        download_additional_files,
+        cfg.dataset.from_dvc,
+    )
+
     data_module = CLIPReIDDataModuleStage1(cfg)
     data_module.setup()
-    
+
     dataset_info = data_module.get_dataset_info()
 
     model = CLIPReIDModuleStage1(
@@ -54,7 +75,7 @@ def main(cfg: DictConfig):
         view_num=dataset_info["view_num"],
         num_query=dataset_info["num_query"],
     )
-    
+
     print("Loading from checkpoint {}".format(model_path))
     state_dict = torch.load(model_path, weights_only=True)
     new_state_dict = {}
@@ -68,13 +89,14 @@ def main(cfg: DictConfig):
         devices=DEVICES,
         precision=PRECISION,
     )
-    
+
     trainer.predict(model, datamodule=data_module)
-    
+
     cmc, mAP, _, _, _, _, _ = model.evaluator.compute()
     print(f"Test Results - Rank-1: {cmc[0]:.2%}")
     print(f"Test Results - Rank-5: {cmc[4]:.2%}")
     print(f"Test Results - mAP: {mAP:.2%}")
+
 
 if __name__ == "__main__":
     main()

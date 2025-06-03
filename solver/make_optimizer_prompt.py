@@ -21,7 +21,9 @@ def make_optimizer_1stage(cfg, model):
             weight_decay=cfg.training.solver.stage1.weight_decay,
         )
     else:
-        optimizer = getattr(torch.optim, cfg.training.solver.stage1.optimizer_name)(params)
+        optimizer = getattr(torch.optim, cfg.training.solver.stage1.optimizer_name)(
+            params
+        )
     return optimizer
 
 
@@ -40,7 +42,10 @@ def make_optimizer_2stage(cfg, model, center_criterion):
         lr = cfg.training.solver.stage2.base_lr
         weight_decay = cfg.training.solver.stage2.weight_decay
         if "bias" in key:
-            lr = cfg.training.solver.stage2.base_lr * cfg.training.solver.stage2.bias_lr_factor
+            lr = (
+                cfg.training.solver.stage2.base_lr
+                * cfg.training.solver.stage2.bias_lr_factor
+            )
             weight_decay = cfg.training.solver.stage2.weight_decay_bias
         if cfg.training.solver.stage2.large_fc_lr:
             if "classifier" in key or "arcface" in key:
@@ -60,7 +65,9 @@ def make_optimizer_2stage(cfg, model, center_criterion):
             weight_decay=cfg.training.solver.stage2.weight_decay,
         )
     else:
-        optimizer = getattr(torch.optim, cfg.training.solver.stage2.optimizer_name)(params)
+        optimizer = getattr(torch.optim, cfg.training.solver.stage2.optimizer_name)(
+            params
+        )
     optimizer_center = torch.optim.SGD(
         center_criterion.parameters(), lr=cfg.training.solver.stage2.center_lr
     )

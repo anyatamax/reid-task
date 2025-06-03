@@ -1,7 +1,8 @@
+from typing import Tuple
+
+import onnx
 import torch
 import torch.nn as nn
-import onnx
-from typing import Tuple
 
 
 def export_model_to_onnx(
@@ -25,18 +26,15 @@ def export_model_to_onnx(
         input_names.append("view_label")
     output_names = ["features"]
 
-    dynamic_axes = {
-        "input": {0: "batch_size"},
-        "features": {0: "batch_size"}
-    }
+    dynamic_axes = {"input": {0: "batch_size"}, "features": {0: "batch_size"}}
     if use_camera:
         dynamic_axes["camera_label"] = {0: "batch_size"}
     if use_view:
         dynamic_axes["view_label"] = {0: "batch_size"}
-    
+
     cam_label = torch.zeros(1, dtype=torch.int64) if use_camera else None
     view_label = torch.zeros(1, dtype=torch.int64) if use_view else None
-    
+
     dummy_input = torch.randn(input_shape, device=next(model.parameters()).device)
 
     model.eval()
@@ -51,7 +49,7 @@ def export_model_to_onnx(
             opset_version=opset_version,
             export_params=export_params,
             do_constant_folding=do_constant_folding,
-            verbose=verbose
+            verbose=verbose,
         )
     elif cam_label is not None:
         torch.onnx.export(
@@ -64,7 +62,7 @@ def export_model_to_onnx(
             opset_version=opset_version,
             export_params=export_params,
             do_constant_folding=do_constant_folding,
-            verbose=verbose
+            verbose=verbose,
         )
     elif view_label is not None:
         torch.onnx.export(
@@ -77,7 +75,7 @@ def export_model_to_onnx(
             opset_version=opset_version,
             export_params=export_params,
             do_constant_folding=do_constant_folding,
-            verbose=verbose
+            verbose=verbose,
         )
     else:
         torch.onnx.export(
@@ -90,9 +88,9 @@ def export_model_to_onnx(
             opset_version=opset_version,
             export_params=export_params,
             do_constant_folding=do_constant_folding,
-            verbose=verbose
+            verbose=verbose,
         )
-    
+
     if verbose:
         print(f"Model exported to ONNX format at: {save_path}")
 
