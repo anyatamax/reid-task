@@ -163,39 +163,6 @@ class CLIPReIDModuleStage1(pl.LightningModule):
             
         feat = self.model(img, cam_label=camids, view_label=target_view)
         self.evaluator.update((feat, pid, camid))
-    
-    def on_predict_epoch_end(self):
-        cmc, mAP, _, _, _, _, _ = self.evaluator.compute()
-        
-        self.log(
-            "test_mAP",
-            mAP,
-            prog_bar=True,
-            logger=True,
-            on_epoch=True,
-        )
-        self.log(
-            "test_rank1",
-            cmc[0],
-            prog_bar=True,
-            logger=True,
-            on_epoch=True,
-        )
-        self.log(
-            "test_rank5",
-            cmc[4],
-            prog_bar=True,
-            logger=True,
-            on_epoch=True,
-        )
-        self.log(
-            "test_rank10",
-            cmc[9],
-            prog_bar=True,
-            logger=True,
-            on_epoch=True,
-        )
-        
 
 
 class CLIPReIDModuleStage2(pl.LightningModule):
@@ -356,6 +323,10 @@ class CLIPReIDModuleStage2(pl.LightningModule):
             
         feat = self.model(img, cam_label=camids, view_label=target_view)
         self.evaluator.update((feat, pid, camid))
+    
+    def on_validation_epoch_start(self):
+        self.evaluator.reset()
+        self.model.eval()
     
     def on_validation_epoch_end(self):
         cmc, mAP, _, _, _, _, _ = self.evaluator.compute()

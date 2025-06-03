@@ -8,7 +8,7 @@ ims_per_batch: 32
 # If test with re-ranking
 re_ranking: false
 # Path to trained model
-weight: "Market1501_CLIP-ReID_RN50_article.pth"
+weight: "CLIP-ReID_RN50_final.pth"
 # Which feature of BNNeck to be used for test, before or after BNNneck
 # Options: 'before' or 'after'
 neck_feat: "before"

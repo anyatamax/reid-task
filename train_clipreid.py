@@ -109,7 +109,7 @@ def main(cfg: DictConfig):
     model_path = os.path.join(cfg.output_dir, cfg.model.model_chkp_name_stage1)
     if not os.path.exists(model_path):
         print("Not found checkpoint. Start training stage 1")
-        trainer_stage1.fit(model_stage1, data_module_stage1)
+        trainer_stage1.fit(model_stage1, datamodule=data_module_stage1)
         torch.save(model_stage1.model.state_dict(), model_path)
         model_after_stage2 = model_stage1.model
     else:
@@ -170,12 +170,12 @@ def main(cfg: DictConfig):
         callbacks=callbacks_stage2,
         logger=logger_stage2,
         log_every_n_steps=cfg.training.solver.log_period,
-        check_val_every_n_epoch=cfg.training.solver.eval_period,
+        check_val_every_n_epoch=None,
         deterministic=DETERMINISTIC,
         num_sanity_val_steps=0,
     )
     
-    trainer_stage2.fit(model_stage2, data_module_stage2)
+    trainer_stage2.fit(model_stage2, datamodule=data_module_stage2)
 
     torch.save(
         model_stage2.model.state_dict(),

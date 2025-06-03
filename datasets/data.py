@@ -115,7 +115,7 @@ class CLIPReIDDataModuleStage1(pl.LightningDataModule):
             persistent_workers=True,
         )
     
-    def test_dataloader(self):
+    def predict_dataloader(self):
         return self.val_dataloader()
 
     def get_dataset_info(self):
@@ -174,28 +174,6 @@ class CLIPReIDDataModuleStage2(pl.LightningDataModule):
 
     def train_dataloader(self):
         if "triplet" in self.sampler:
-            # if DIST_TRAIN:
-            #     print("DIST_TRAIN START")
-            #     mini_batch_size = self.batch_size_stage2 // dist.get_world_size()
-            #     data_sampler = RandomIdentitySampler_DDP(
-            #         self.dataset.train,
-            #         self.batch_size_stage2,
-            #         self.num_instance,
-            #     )
-            #     batch_sampler = torch.utils.data.sampler.BatchSampler(
-            #         data_sampler, 
-            #         mini_batch_size,
-            #         True
-            #     )
-            #     return DataLoader(
-            #         self.train_set,
-            #         num_workers=self.num_workers,
-            #         batch_sampler=batch_sampler,
-            #         collate_fn=train_collate_fn,
-            #         pin_memory=True,
-            #         persistent_workers=True,
-            #     )
-            # else:
             return DataLoader(
                 self.train_set,
                 batch_size=self.batch_size_stage2,
@@ -234,9 +212,6 @@ class CLIPReIDDataModuleStage2(pl.LightningDataModule):
             collate_fn=val_collate_fn,
             persistent_workers=True,
         )
-    
-    def test_dataloader(self):
-        return self.val_dataloader()
 
     def get_dataset_info(self):
         return {

@@ -56,18 +56,11 @@ def main(cfg: DictConfig):
         name = k.replace("module.", "") if k.startswith("module.") else k
         new_state_dict[name] = v
     model.model.load_state_dict(new_state_dict, strict=False)
-    
-    logger_test = MLFlowLogger(
-        experiment_name=cfg.logging.experiment_name,
-        run_name=cfg.logging.run_name + "_predict",
-        tracking_uri=cfg.logging.mlflow_tracking_uri,
-    )
 
     trainer = pl.Trainer(
         accelerator=ACCELERATOR,
         devices=DEVICES,
         precision=PRECISION,
-        logger=logger_test,
     )
     
     trainer.predict(model, datamodule=data_module)
