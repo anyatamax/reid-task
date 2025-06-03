@@ -1,0 +1,5 @@
+outs:
+- md5: 5c0f6077ead0e2aef55e4cb50fb7168d
+  size: 154864150
+  hash: md5
+  path: CLIP-ReID_RN50_final_onnx_format.onnx

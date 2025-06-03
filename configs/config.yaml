@@ -9,3 +9,4 @@ defaults:
 
 # Output directory for logs and checkpoints
 output_dir: "model_chkp"
+export_to_onnx: True

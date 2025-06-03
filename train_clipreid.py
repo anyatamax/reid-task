@@ -10,6 +10,8 @@ from model.model_pl import CLIPReIDModuleStage1, CLIPReIDModuleStage2
 from configs.constants import *
 from utils.dvc_utils import download_dvc_data
 from utils.download_data import download_data, download_additional_files
+from utils.export_onnx import export_model_to_onnx
+from model.onnx_wrapper import CLIPReIDONNXWrapper
 
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor, EarlyStopping, Timer
@@ -181,12 +183,46 @@ def main(cfg: DictConfig):
         num_sanity_val_steps=0,
     )
     
-    trainer_stage2.fit(model_stage2, datamodule=data_module_stage2)
+    # Saving
+    model_final = os.path.join(cfg.output_dir, cfg.model.model_chkp_name_stage2)
+    if not os.path.exists(model_final):
+        print("Not found final model. Start training stage 2")
+        trainer_stage2.fit(model_stage2, datamodule=data_module_stage2)
+        torch.save(
+            model_stage2.model.state_dict(),
+            model_final,
+        )
+    else:
+        print("Loading from checkpoint {} final model".format(model_final))
+        state_dict = torch.load(model_final, weights_only=True)
+        new_state_dict = {}
+        for k, v in state_dict.items():
+            name = k.replace("module.", "") if k.startswith("module.") else k
+            new_state_dict[name] = v
+        model_after_stage2.load_state_dict(new_state_dict, strict=False)
+    
+    if cfg.export_to_onnx:
+        print("Exporting model to ONNX format...")
 
-    torch.save(
-        model_stage2.model.state_dict(),
-        os.path.join(cfg.output_dir, cfg.model.model_chkp_name_stage2),
-    )
+        use_camera = cfg.model.sie_camera
+        use_view = cfg.model.sie_view
+
+        onnx_wrapper = CLIPReIDONNXWrapper(
+            model=model_stage2.model,
+            use_camera=use_camera,
+            use_view=use_view
+        )
+        input_shape = (1, 3, cfg.preprocessing.size_test[0], cfg.preprocessing.size_test[1])
+
+        model_onnx_path = os.path.join(cfg.output_dir, cfg.model.model_chkp_final_onnx)
+        export_model_to_onnx(
+            model=onnx_wrapper,
+            save_path=model_onnx_path,
+            input_shape=input_shape,
+            verbose=True,
+            use_camera=use_camera,
+            use_view=use_view
+        )
 
 if __name__ == "__main__":
     main()
