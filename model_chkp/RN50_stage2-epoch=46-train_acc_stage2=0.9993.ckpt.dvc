@@ -1,0 +1,5 @@
+outs:
+- md5: e926fd246003f28bad9c936d5b306d6e
+  size: 656564923
+  hash: md5
+  path: RN50_stage2-epoch=46-train_acc_stage2=0.9993.ckpt

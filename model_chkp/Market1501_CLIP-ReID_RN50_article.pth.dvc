@@ -1,0 +1,5 @@
+outs:
+- md5: 675cd7a7cdefadde0a1fa28ab0f5d579
+  size: 323481228
+  hash: md5
+  path: Market1501_CLIP-ReID_RN50_article.pth

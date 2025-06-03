@@ -1,0 +1,5 @@
+outs:
+- md5: 64de46a35b223d82b6faf19f5fa3aed8
+  size: 323462431
+  hash: md5
+  path: CLIP-ReID_RN50_final.pth

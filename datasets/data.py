@@ -11,10 +11,10 @@ from .market1501 import Market1501
 # from .msmt17 import MSMT17
 # from .occ_duke import OCC_DukeMTMCreID
 from .sampler import RandomIdentitySampler
-from .sampler_ddp import RandomIdentitySampler_DDP
+# from .sampler_ddp import RandomIdentitySampler_DDP
 # from .vehicleid import VehicleID
 # from .veri import VeRi
-from configs.constants import DEVICE, DIST_TRAIN
+from configs.constants import DEVICE
 
 factory = {
     "market1501": Market1501,
@@ -174,40 +174,40 @@ class CLIPReIDDataModuleStage2(pl.LightningDataModule):
 
     def train_dataloader(self):
         if "triplet" in self.sampler:
-            if DIST_TRAIN:
-                print("DIST_TRAIN START")
-                mini_batch_size = self.batch_size_stage2 // dist.get_world_size()
-                data_sampler = RandomIdentitySampler_DDP(
+            # if DIST_TRAIN:
+            #     print("DIST_TRAIN START")
+            #     mini_batch_size = self.batch_size_stage2 // dist.get_world_size()
+            #     data_sampler = RandomIdentitySampler_DDP(
+            #         self.dataset.train,
+            #         self.batch_size_stage2,
+            #         self.num_instance,
+            #     )
+            #     batch_sampler = torch.utils.data.sampler.BatchSampler(
+            #         data_sampler, 
+            #         mini_batch_size,
+            #         True
+            #     )
+            #     return DataLoader(
+            #         self.train_set,
+            #         num_workers=self.num_workers,
+            #         batch_sampler=batch_sampler,
+            #         collate_fn=train_collate_fn,
+            #         pin_memory=True,
+            #         persistent_workers=True,
+            #     )
+            # else:
+            return DataLoader(
+                self.train_set,
+                batch_size=self.batch_size_stage2,
+                sampler=RandomIdentitySampler(
                     self.dataset.train,
                     self.batch_size_stage2,
                     self.num_instance,
-                )
-                batch_sampler = torch.utils.data.sampler.BatchSampler(
-                    data_sampler, 
-                    mini_batch_size,
-                    True
-                )
-                return DataLoader(
-                    self.train_set,
-                    num_workers=self.num_workers,
-                    batch_sampler=batch_sampler,
-                    collate_fn=train_collate_fn,
-                    pin_memory=True,
-                    persistent_workers=True,
-                )
-            else:
-                return DataLoader(
-                    self.train_set,
-                    batch_size=self.batch_size_stage2,
-                    sampler=RandomIdentitySampler(
-                        self.dataset.train,
-                        self.batch_size_stage2,
-                        self.num_instance,
-                    ),
-                    num_workers=self.num_workers,
-                    collate_fn=train_collate_fn,
-                    persistent_workers=True,
-                )
+                ),
+                num_workers=self.num_workers,
+                collate_fn=train_collate_fn,
+                persistent_workers=True,
+            )
         elif self.sampler == "softmax":
             print("using softmax sampler")
             return DataLoader(

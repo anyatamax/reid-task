@@ -1,7 +1,5 @@
-import argparse
 import os
 import random
-import datetime
 
 import numpy as np
 import torch
@@ -14,9 +12,8 @@ from utils.dvc_utils import download_dvc_data
 from utils.download_data import download_data
 
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor, EarlyStopping, ModelSummary, Timer
-from pytorch_lightning.loggers import TensorBoardLogger
-from pytorch_lightning.strategies import DDPStrategy
+from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor, EarlyStopping, Timer
+from pytorch_lightning.loggers import MLFlowLogger
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
@@ -40,7 +37,7 @@ def main(cfg: DictConfig):
         os.makedirs(output_model_dir)
     print("Saving model in the path : {}".format(output_model_dir))
         
-    output_log_dir = cfg.ououtput_log_dirtput_dir
+    output_log_dir = cfg.logging.output_log_dir
     if output_log_dir and not os.path.exists(output_log_dir):
         os.makedirs(output_log_dir)
     print("Logging in the path : {}".format(output_log_dir))
@@ -58,16 +55,6 @@ def main(cfg: DictConfig):
         else:
             print("Downloading data from Google Disk...")
             download_data()
-    
-    if DIST_TRAIN:
-        strategy = DDPStrategy(
-            process_group_backend="nccl",
-            find_unused_parameters=False,
-            timeout=datetime.timedelta(seconds=1800),
-            gradient_as_bucket_view=True,
-        )
-    else:
-        strategy = "auto"
         
     if mp.get_start_method(allow_none=True) != 'spawn':
         mp.set_start_method('spawn', force=True)
@@ -83,6 +70,7 @@ def main(cfg: DictConfig):
         num_classes=dataset_info["num_classes"],
         camera_num=dataset_info["camera_num"],
         view_num=dataset_info["view_num"],
+        num_query=dataset_info["num_query"],
     )
 
     callbacks_stage1 = [
@@ -98,17 +86,18 @@ def main(cfg: DictConfig):
         Timer()
     ]
     
-    logger_stage1 = TensorBoardLogger(
+    logger_stage1 = MLFlowLogger(
+        experiment_name=cfg.logging.experiment_name,
+        run_name=cfg.logging.run_name + "_stage1",
         save_dir=output_log_dir,
-        name=cfg.logging.tesorboard_dir,
-        default_hp_metric=False,
+        tracking_uri=cfg.logging.mlflow_tracking_uri,
     )
     
     trainer_stage1 = pl.Trainer(
         max_epochs=cfg.training.solver.stage1.max_epochs,
         accelerator=ACCELERATOR,
         devices=DEVICES,
-        strategy=strategy,
+        strategy="auto",
         precision=PRECISION,
         callbacks=callbacks_stage1,
         logger=logger_stage1,
@@ -121,6 +110,7 @@ def main(cfg: DictConfig):
     if not os.path.exists(model_path):
         print("Not found checkpoint. Start training stage 1")
         trainer_stage1.fit(model_stage1, data_module_stage1)
+        torch.save(model_stage1.model.state_dict(), model_path)
         model_after_stage2 = model_stage1.model
     else:
         print("Loading from checkpoint {}".format(model_path))
@@ -164,17 +154,18 @@ def main(cfg: DictConfig):
         Timer()
     ]
     
-    logger_stage2 = TensorBoardLogger(
+    logger_stage2 = MLFlowLogger(
+        experiment_name=cfg.logging.experiment_name,
+        run_name=cfg.logging.run_name + "_stage2",
         save_dir=output_log_dir,
-        name=cfg.logging.tesorboard_dir,
-        default_hp_metric=False,
+        tracking_uri=cfg.logging.mlflow_tracking_uri,
     )
     
     trainer_stage2 = pl.Trainer(
         max_epochs=cfg.training.solver.stage2.max_epochs,
         accelerator=ACCELERATOR,
         devices=DEVICES,
-        strategy=strategy,
+        strategy="auto",
         precision=PRECISION,
         callbacks=callbacks_stage2,
         logger=logger_stage2,
@@ -186,6 +177,10 @@ def main(cfg: DictConfig):
     
     trainer_stage2.fit(model_stage2, data_module_stage2)
 
+    torch.save(
+        model_stage2.model.state_dict(),
+        os.path.join(cfg.output_dir, cfg.model.model_chkp_name_stage2),
+    )
 
 if __name__ == "__main__":
     main()

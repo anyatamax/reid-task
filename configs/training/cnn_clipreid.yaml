@@ -8,7 +8,7 @@ solver:
   # Stage 1 and Stage 2
   stage1:
     # Images per batch
-    ims_per_batch: 4
+    ims_per_batch: 32
     # Optimizer name
     optimizer_name: "Adam"
     # Base learning rate
@@ -24,7 +24,7 @@ solver:
     # Weight decay for bias parameters
     weight_decay_bias: 1e-4
     # Maximum number of epochs
-    max_epochs: 2
+    max_epochs: 60
     # Checkpoint period (save model every N epochs)
     checkpoint_period: 60
     # Warmup epochs
@@ -40,7 +40,7 @@ solver:
     warmup_iters: 500
   stage2:
     # Images per batch
-    ims_per_batch: 4
+    ims_per_batch: 32
     # Optimizer name
     optimizer_name: "Adam"
     # Base learning rate

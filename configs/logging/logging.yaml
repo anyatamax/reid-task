@@ -1,2 +1,7 @@
 # Logging settings
 tesorboard_dir: "reid_logs"
+output_log_dir: "model_logs"
+mlflow_dir: "mlflow_reid_logs"
+experiment_name: "CLIP ReID"
+run_name: "cnn_clipreid"
+mlflow_tracking_uri: "http://127.0.0.1:6007"

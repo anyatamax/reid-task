@@ -2,12 +2,6 @@
 This file contains constants that are not expected to be changed frequently.
 """
 
-# Random erasing constants
-RANDOM_ERASING_SL = 0.02
-RANDOM_ERASING_SH = 0.4
-RANDOM_ERASING_R1 = 0.3
-RANDOM_ERASING_MEAN = (0.4914, 0.4822, 0.4465)
-
 # Training constants
 PRECISION = "16-mixed"
 LOG_EVERY_N_STEPS = 10
@@ -27,7 +21,6 @@ DETERMINISTIC = True
 ACCELERATOR = "gpu"
 DEVICE = "cuda"
 DEVICES = "auto"
-DIST_TRAIN = False
 
 # Available models to load
 MODELS = {

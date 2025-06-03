@@ -16,13 +16,14 @@ from utils.meter import AverageMeter
 
 
 class CLIPReIDModuleStage1(pl.LightningModule):
-    def __init__(self, cfg, num_classes, camera_num, view_num):
+    def __init__(self, cfg, num_classes, camera_num, view_num, num_query):
         super().__init__()
         self.save_hyperparameters()
         self.cfg = cfg
         self.num_classes = num_classes
         self.camera_num = camera_num
         self.view_num = view_num
+        self.num_query = num_query
         
         self.model = make_model(
             cfg, num_class=self.num_classes, camera_num=self.camera_num, view_num=self.view_num
@@ -128,13 +129,6 @@ class CLIPReIDModuleStage1(pl.LightningModule):
         # self.trainer.fit_loop.epoch_loop.max_steps = self.i_ter
 
     def on_train_epoch_end(self):
-        if self.current_epoch >= self.cfg.training.solver.stage1.max_epochs - 1:
-            torch.save(
-                self.model.state_dict(),
-                os.path.join(
-                    os.path.join(self.cfg.output_dir, self.cfg.model.model_chkp_name_stage1)
-                ),
-            )
         scheduler_stage1 = self.lr_schedulers()
         self.log(
             "base_lr_stage1",
@@ -146,6 +140,62 @@ class CLIPReIDModuleStage1(pl.LightningModule):
     
     def validation_step(self, batch, batch_idx):
         pass
+    
+    def on_predict_epoch_start(self):
+        self.evaluator = R1_mAP_eval(self.num_query, max_rank=50, feat_norm=self.cfg.testing.feat_norm)
+        self.evaluator.reset()
+        self.model.eval()
+    
+    def predict_step(self, batch, batch_idx):
+        img, pid, camid, camids, target_view, _ = batch
+
+        img = img
+        
+        if self.cfg.model.sie_camera:
+            camids = camids
+        else:
+            camids = None
+            
+        if self.cfg.model.sie_view:
+            target_view = target_view
+        else:
+            target_view = None
+            
+        feat = self.model(img, cam_label=camids, view_label=target_view)
+        self.evaluator.update((feat, pid, camid))
+    
+    def on_predict_epoch_end(self):
+        cmc, mAP, _, _, _, _, _ = self.evaluator.compute()
+        
+        self.log(
+            "test_mAP",
+            mAP,
+            prog_bar=True,
+            logger=True,
+            on_epoch=True,
+        )
+        self.log(
+            "test_rank1",
+            cmc[0],
+            prog_bar=True,
+            logger=True,
+            on_epoch=True,
+        )
+        self.log(
+            "test_rank5",
+            cmc[4],
+            prog_bar=True,
+            logger=True,
+            on_epoch=True,
+        )
+        self.log(
+            "test_rank10",
+            cmc[9],
+            prog_bar=True,
+            logger=True,
+            on_epoch=True,
+        )
+        
 
 
 class CLIPReIDModuleStage2(pl.LightningModule):
@@ -283,7 +333,7 @@ class CLIPReIDModuleStage2(pl.LightningModule):
         scheduler_stage2 = self.lr_schedulers()
         self.log(
             "base_lr_stage2",
-            scheduler_stage2._get_lr(self.current_epoch)[0],
+            scheduler_stage2.get_lr()[0],
             on_epoch=True,
             logger=True,
         )
@@ -291,22 +341,21 @@ class CLIPReIDModuleStage2(pl.LightningModule):
     
     def validation_step(self, batch, batch_idx):
         img, pid, camid, camids, target_view, _ = batch
+
+        img = img
         
-        with torch.no_grad():
-            img = img.to(self.device)
+        if self.cfg.model.sie_camera:
+            camids = camids
+        else:
+            camids = None
             
-            if self.cfg.model.sie_camera:
-                camids = camids.to(self.device)
-            else:
-                camids = None
-                
-            if self.cfg.model.sie_view:
-                target_view = target_view.to(self.device)
-            else:
-                target_view = None
-                
-            feat = self.model(img, cam_label=camids, view_label=target_view)
-            self.evaluator.update((feat, pid, camid))
+        if self.cfg.model.sie_view:
+            target_view = target_view
+        else:
+            target_view = None
+            
+        feat = self.model(img, cam_label=camids, view_label=target_view)
+        self.evaluator.update((feat, pid, camid))
     
     def on_validation_epoch_end(self):
         cmc, mAP, _, _, _, _, _ = self.evaluator.compute()
@@ -342,46 +391,3 @@ class CLIPReIDModuleStage2(pl.LightningModule):
         
         self.evaluator.reset()
         torch.cuda.empty_cache()
-    
-    # def on_test_epoch_start(self):
-    #     self.evaluator.reset()
-    #     self.model.eval()
-    
-    # def test_step(self, batch, batch_idx):
-    #     return self.validation_step(batch, batch_idx)
-    
-    # def on_test_epoch_end(self):
-    #     cmc, mAP, _, _, _, _, _ = self.evaluator.compute()
-        
-    #     self.log(
-    #         "test_mAP",
-    #         mAP,
-    #         prog_bar=True,
-    #         logger=True,
-    #         on_epoch=True,
-    #     )
-    #     self.log(
-    #         "test_rank1",
-    #         cmc[0],
-    #         prog_bar=True,
-    #         logger=True,
-    #         on_epoch=True,
-    #     )
-    #     self.log(
-    #         "test_rank5",
-    #         cmc[4],
-    #         prog_bar=True,
-    #         logger=True,
-    #         on_epoch=True,
-    #     )
-    #     self.log(
-    #         "test_rank10",
-    #         cmc[9],
-    #         prog_bar=True,
-    #         logger=True,
-    #         on_epoch=True,
-    #     )
-        
-    #     self.print(f"Test Results - Rank-1: {cmc[0]:.1%}")
-    #     self.print(f"Test Results - Rank-5: {cmc[4]:.1%}")
-    #     self.print(f"Test Results - mAP: {mAP:.1%}")

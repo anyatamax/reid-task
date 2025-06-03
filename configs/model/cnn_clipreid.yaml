@@ -5,6 +5,7 @@
 name: "RN50"
 # Path to checkpoint
 model_chkp_name_stage1: "RN50_stage1_60.pth"
+model_chkp_name_stage2: "CLIP-ReID_RN50_final.pth"
 # Last stride of backbone
 last_stride: 1
 # Path to pretrained model of backbone

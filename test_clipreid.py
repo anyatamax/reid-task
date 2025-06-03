@@ -1,91 +1,81 @@
 import argparse
 import os
+import torch
 
-from config import cfg
-from datasets.make_dataloader_clipreid import make_dataloader
-from model.make_model_clipreid import make_model
-from processor.processor_clipreid_stage2 import do_inference
-from utils.logger import setup_logger
+from datasets.data import CLIPReIDDataModuleStage1
+from model.model_pl import CLIPReIDModuleStage1
+from utils.dvc_utils import download_dvc_data
+from utils.download_data import download_data
+from configs.constants import *
+
+import pytorch_lightning as pl
+import hydra
+from omegaconf import DictConfig, OmegaConf
+from pytorch_lightning.loggers import MLFlowLogger
+
+@hydra.main(config_path="configs", config_name="config", version_base=None)
+def main(cfg: DictConfig):
+    print(OmegaConf.to_yaml(cfg))
+    
+    model_path = os.path.join(cfg.output_dir, cfg.testing.weight)
+    if not os.path.exists(model_path):
+        print("Not found result model. Need to train in train_clipreid.py or download from dvc")
+        return
+    
+    # Download data
+    data_path =  os.path.join(cfg.dataset.root_dir, cfg.dataset.data_dir, cfg.dataset.dataset_dir)
+    if os.path.exists(data_path):
+        print("Dataset already downloaded")
+    else:
+        if cfg.dataset.from_dvc:
+            print("Downloading data from DVC remote...")
+            download_success = download_dvc_data(data_dir=cfg.dataset.data_dir, dataset_name=cfg.dataset.dataset_dir + ".dvc")
+            if not download_success:
+                download_data()
+        else:
+            print("Downloading data from Google Disk...")
+            download_data()
+            
+    data_module = CLIPReIDDataModuleStage1(cfg)
+    data_module.setup()
+    
+    dataset_info = data_module.get_dataset_info()
+
+    model = CLIPReIDModuleStage1(
+        cfg=cfg,
+        num_classes=dataset_info["num_classes"],
+        camera_num=dataset_info["camera_num"],
+        view_num=dataset_info["view_num"],
+        num_query=dataset_info["num_query"],
+    )
+    
+    print("Loading from checkpoint {}".format(model_path))
+    state_dict = torch.load(model_path, weights_only=True)
+    new_state_dict = {}
+    for k, v in state_dict.items():
+        name = k.replace("module.", "") if k.startswith("module.") else k
+        new_state_dict[name] = v
+    model.model.load_state_dict(new_state_dict, strict=False)
+    
+    logger_test = MLFlowLogger(
+        experiment_name=cfg.logging.experiment_name,
+        run_name=cfg.logging.run_name + "_predict",
+        tracking_uri=cfg.logging.mlflow_tracking_uri,
+    )
+
+    trainer = pl.Trainer(
+        accelerator=ACCELERATOR,
+        devices=DEVICES,
+        precision=PRECISION,
+        logger=logger_test,
+    )
+    
+    trainer.predict(model, datamodule=data_module)
+    
+    cmc, mAP, _, _, _, _, _ = model.evaluator.compute()
+    print(f"Test Results - Rank-1: {cmc[0]:.2%}")
+    print(f"Test Results - Rank-5: {cmc[4]:.2%}")
+    print(f"Test Results - mAP: {mAP:.2%}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="ReID Baseline Training")
-    parser.add_argument(
-        "--config_file",
-        default="configs/person/vit_clipreid.yml",
-        help="path to config file",
-        type=str,
-    )
-    parser.add_argument(
-        "opts",
-        help="Modify config options using the command-line",
-        default=None,
-        nargs=argparse.REMAINDER,
-    )
-
-    args = parser.parse_args()
-
-    if args.config_file != "":
-        cfg.merge_from_file(args.config_file)
-    cfg.merge_from_list(args.opts)
-    cfg.freeze()
-
-    output_dir = cfg.OUTPUT_DIR
-    if output_dir and not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    logger = setup_logger("transreid", output_dir, if_train=False)
-    logger.info(args)
-
-    if args.config_file != "":
-        logger.info("Loaded configuration file {}".format(args.config_file))
-        with open(args.config_file, "r") as cf:
-            config_str = "\n" + cf.read()
-            logger.info(config_str)
-    logger.info("Running with config:\n{}".format(cfg))
-
-    os.environ["CUDA_VISIBLE_DEVICES"] = cfg.MODEL.DEVICE_ID
-
-    (
-        train_loader,
-        train_loader_normal,
-        val_loader,
-        num_query,
-        num_classes,
-        camera_num,
-        view_num,
-    ) = make_dataloader(cfg)
-
-    model = make_model(
-        cfg, num_class=num_classes, camera_num=camera_num, view_num=view_num
-    )
-    model.load_param(cfg.TEST.WEIGHT)
-
-    if cfg.DATASETS.NAMES == "VehicleID":
-        for trial in range(10):
-            (
-                train_loader,
-                train_loader_normal,
-                val_loader,
-                num_query,
-                num_classes,
-                camera_num,
-                view_num,
-            ) = make_dataloader(cfg)
-            rank_1, rank5, mAP = do_inference(cfg, model, val_loader, num_query)
-            if trial == 0:
-                all_rank_1 = rank_1
-                all_rank_5 = rank5
-                all_mAP = mAP
-            else:
-                all_rank_1 = all_rank_1 + rank_1
-                all_rank_5 = all_rank_5 + rank5
-                all_mAP = all_mAP + mAP
-
-            logger.info("rank_1:{}, rank_5 {} : mAP : {}".format(rank_1, rank5, mAP))
-        logger.info(
-            "sum_rank_1:{:.1%}, sum_rank_5 {:.1%}, sum_mAP {:.1%}".format(
-                all_rank_1.sum() / 10.0, all_rank_5.sum() / 10.0, all_mAP.sum() / 10.0
-            )
-        )
-    else:
-        do_inference(cfg, model, val_loader, num_query)
+    main()
