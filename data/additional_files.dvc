@@ -1,0 +1,6 @@
+outs:
+- md5: ffbba75c3101365b3b86d1c92de070c3.dir
+  size: 10162619
+  nfiles: 3
+  hash: md5
+  path: additional_files

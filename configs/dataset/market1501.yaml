@@ -7,6 +7,9 @@ names: 'market1501'
 # Name dir
 dataset_dir: "Market-1501-v15.09.15"
 
+# Name files dir
+files_dir: "additional_files"
+
 # Data dir
 data_dir: "data"
   
@@ -14,4 +17,4 @@ data_dir: "data"
 root_dir: '/home/maksimovaam/reid-task/'
 
 # The way to download data
-from_dvc: True
+from_dvc: False

@@ -9,7 +9,7 @@ from datasets.data import CLIPReIDDataModuleStage1, CLIPReIDDataModuleStage2
 from model.model_pl import CLIPReIDModuleStage1, CLIPReIDModuleStage2
 from configs.constants import *
 from utils.dvc_utils import download_dvc_data
-from utils.download_data import download_data
+from utils.download_data import download_data, download_additional_files
 
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor, EarlyStopping, Timer
@@ -25,6 +25,20 @@ def set_seed(seed):
     random.seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = True
+
+def download(root_dir, data_dir, dataset_dir, download_dvc, download_from_disk, from_dvc):
+    data_path =  os.path.join(root_dir, data_dir, dataset_dir)
+    if os.path.exists(data_path):
+        print(f"{dataset_dir} already downloaded")
+    else:
+        if from_dvc:
+            print(f"Downloading {dataset_dir} from DVC remote...")
+            download_success = download_dvc(data_dir=data_dir, dataset_name=dataset_dir + ".dvc")
+            if not download_success:
+                download_from_disk()
+        else:
+            print(f"Downloading {dataset_dir} from Google Disk...")
+            download_from_disk()
 
 @hydra.main(config_path="configs", config_name="config", version_base=None)
 def main(cfg: DictConfig):
@@ -43,18 +57,10 @@ def main(cfg: DictConfig):
     print("Logging in the path : {}".format(output_log_dir))
     
     # Download data
-    data_path =  os.path.join(cfg.dataset.root_dir, cfg.dataset.data_dir, cfg.dataset.dataset_dir)
-    if os.path.exists(data_path):
-        print("Dataset already downloaded")
-    else:
-        if cfg.dataset.from_dvc:
-            print("Downloading data from DVC remote...")
-            download_success = download_dvc_data(data_dir=cfg.dataset.data_dir, dataset_name=cfg.dataset.dataset_dir + ".dvc")
-            if not download_success:
-                download_data()
-        else:
-            print("Downloading data from Google Disk...")
-            download_data()
+    download(cfg.dataset.root_dir, cfg.dataset.data_dir, cfg.dataset.dataset_dir, download_dvc_data, download_data, cfg.dataset.from_dvc)
+    
+    # Download additional files
+    download(cfg.dataset.root_dir, cfg.dataset.data_dir, cfg.dataset.files_dir, download_dvc_data, download_additional_files, cfg.dataset.from_dvc)
         
     if mp.get_start_method(allow_none=True) != 'spawn':
         mp.set_start_method('spawn', force=True)

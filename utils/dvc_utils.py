@@ -1,6 +1,7 @@
 import os
 import os.path as osp
 import subprocess
+import fire
 
 def download_dvc_data(data_dir="data", dataset_name="Market-1501-v15.09.15.dvc", remote=None):
     """
@@ -37,4 +38,4 @@ def download_dvc_data(data_dir="data", dataset_name="Market-1501-v15.09.15.dvc",
             os.chdir(current_dir)
 
 if __name__ == "__main__":
-    download_dvc_data()
+    fire.Fire(download_dvc_data)
