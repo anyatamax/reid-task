@@ -43,7 +43,6 @@ def main(cfg: DictConfig):
         return
 
     # Download data
-    # Download data
     download(
         cfg.dataset.root_dir,
         cfg.dataset.data_dir,
