@@ -1,5 +1,5 @@
 import hashlib
-import os
+from pathlib import Path
 import urllib
 import warnings
 from typing import List, Union
@@ -37,17 +37,17 @@ _MODELS = {
 }
 
 
-def _download(url: str, root: str = os.path.expanduser("~/.cache/clip")):
-    os.makedirs(root, exist_ok=True)
-    filename = os.path.basename(url)
+def _download(url: str, root: str = str(Path.home() / ".cache" / "clip")):
+    Path(root).mkdir(parents=True, exist_ok=True)
+    filename = Path(url).name
 
     expected_sha256 = url.split("/")[-2]
-    download_target = os.path.join(root, filename)
+    download_target = Path(root) / filename
 
-    if os.path.exists(download_target) and not os.path.isfile(download_target):
+    if download_target.exists() and not download_target.is_file():
         raise RuntimeError(f"{download_target} exists and is not a regular file")
 
-    if os.path.isfile(download_target):
+    if download_target.is_file():
         if (
             hashlib.sha256(open(download_target, "rb").read()).hexdigest()
             == expected_sha256
@@ -132,7 +132,7 @@ def available_models() -> List[str]:
 #     """
 #     if name in _MODELS:
 #         model_path = _download(_MODELS[name])
-#     elif os.path.isfile(name):
+#     elif Path(name).is_file():
 #         model_path = name
 #     else:
 #         raise RuntimeError(

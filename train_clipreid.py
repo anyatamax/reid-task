@@ -1,5 +1,5 @@
-import os
 import random
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -29,8 +29,8 @@ def set_seed(seed):
     torch.backends.cudnn.benchmark = True
 
 def download(root_dir, data_dir, dataset_dir, download_dvc, download_from_disk, from_dvc):
-    data_path =  os.path.join(root_dir, data_dir, dataset_dir)
-    if os.path.exists(data_path):
+    data_path = Path(root_dir) / data_dir / dataset_dir
+    if data_path.exists():
         print(f"{dataset_dir} already downloaded")
     else:
         if from_dvc:
@@ -49,13 +49,17 @@ def main(cfg: DictConfig):
     set_seed(cfg.training.solver.seed)
 
     output_model_dir = cfg.output_dir
-    if output_model_dir and not os.path.exists(output_model_dir):
-        os.makedirs(output_model_dir)
+    if output_model_dir:
+        output_path = Path(output_model_dir)
+        if not output_path.exists():
+            output_path.mkdir(parents=True, exist_ok=True)
     print("Saving model in the path : {}".format(output_model_dir))
         
     output_log_dir = cfg.logging.output_log_dir
-    if output_log_dir and not os.path.exists(output_log_dir):
-        os.makedirs(output_log_dir)
+    if output_log_dir:
+        log_path = Path(output_log_dir)
+        if not log_path.exists():
+            log_path.mkdir(parents=True, exist_ok=True)
     print("Logging in the path : {}".format(output_log_dir))
     
     # Download data
@@ -114,8 +118,8 @@ def main(cfg: DictConfig):
         deterministic=DETERMINISTIC,
     )
     
-    model_path = os.path.join(cfg.output_dir, cfg.model.model_chkp_name_stage1)
-    if not os.path.exists(model_path):
+    model_path = Path(cfg.output_dir) / cfg.model.model_chkp_name_stage1
+    if not model_path.exists():
         print("Not found checkpoint. Start training stage 1")
         trainer_stage1.fit(model_stage1, datamodule=data_module_stage1)
         torch.save(model_stage1.model.state_dict(), model_path)
@@ -184,8 +188,8 @@ def main(cfg: DictConfig):
     )
     
     # Saving
-    model_final = os.path.join(cfg.output_dir, cfg.model.model_chkp_name_stage2)
-    if not os.path.exists(model_final):
+    model_final = Path(cfg.output_dir) / cfg.model.model_chkp_name_stage2
+    if not model_final.exists():
         print("Not found final model. Start training stage 2")
         trainer_stage2.fit(model_stage2, datamodule=data_module_stage2)
         torch.save(
@@ -214,7 +218,7 @@ def main(cfg: DictConfig):
         )
         input_shape = (1, 3, cfg.preprocessing.size_test[0], cfg.preprocessing.size_test[1])
 
-        model_onnx_path = os.path.join(cfg.output_dir, cfg.model.model_chkp_final_onnx)
+        model_onnx_path = Path(cfg.output_dir) / cfg.model.model_chkp_final_onnx
         export_model_to_onnx(
             model=onnx_wrapper,
             save_path=model_onnx_path,

@@ -4,7 +4,7 @@
 """
 
 import glob
-import os.path as osp
+from pathlib import Path
 import re
 
 from .bases import BaseImageDataset
@@ -24,10 +24,10 @@ class Market1501(BaseImageDataset):
 
     def __init__(self, root="", data_dir="data", dataset_dir="Market-1501-v15.09.15", verbose=True, pid_begin=0, **kwargs):
         super(Market1501, self).__init__()
-        self.dataset_dir = osp.join(root, data_dir, dataset_dir)
-        self.train_dir = osp.join(self.dataset_dir, "bounding_box_train")
-        self.query_dir = osp.join(self.dataset_dir, "query")
-        self.gallery_dir = osp.join(self.dataset_dir, "bounding_box_test")
+        self.dataset_dir = Path(root) / data_dir / dataset_dir
+        self.train_dir = self.dataset_dir / "bounding_box_train"
+        self.query_dir = self.dataset_dir / "query"
+        self.gallery_dir = self.dataset_dir / "bounding_box_test"
 
         self._check_before_run()
         self.pid_begin = pid_begin
@@ -64,17 +64,17 @@ class Market1501(BaseImageDataset):
 
     def _check_before_run(self):
         """Check if all files are available before going deeper"""
-        if not osp.exists(self.dataset_dir):
+        if not self.dataset_dir.exists():
             raise RuntimeError("'{}' is not available".format(self.dataset_dir))
-        if not osp.exists(self.train_dir):
+        if not self.train_dir.exists():
             raise RuntimeError("'{}' is not available".format(self.train_dir))
-        if not osp.exists(self.query_dir):
+        if not self.query_dir.exists():
             raise RuntimeError("'{}' is not available".format(self.query_dir))
-        if not osp.exists(self.gallery_dir):
+        if not self.gallery_dir.exists():
             raise RuntimeError("'{}' is not available".format(self.gallery_dir))
 
     def _process_dir(self, dir_path, relabel=False):
-        img_paths = glob.glob(osp.join(dir_path, "*.jpg"))
+        img_paths = glob.glob(str(Path(dir_path) / "*.jpg"))
         pattern = re.compile(r"([-\d]+)_c(\d)")
 
         pid_container = set()

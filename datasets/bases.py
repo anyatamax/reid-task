@@ -1,4 +1,4 @@
-import os.path as osp
+from pathlib import Path
 
 from PIL import Image, ImageFile
 from torch.utils.data import Dataset
@@ -10,7 +10,8 @@ def read_image(img_path):
     """Keep reading image until succeed.
     This can avoid IOError incurred by heavy IO process."""
     got_img = False
-    if not osp.exists(img_path):
+    img_path_obj = Path(img_path)
+    if not img_path_obj.exists():
         raise IOError("{} does not exist".format(img_path))
     while not got_img:
         try:

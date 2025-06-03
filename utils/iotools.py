@@ -1,26 +1,21 @@
-# encoding: utf-8
-"""
-@author:  sherlock
-@contact: sherlockliao01@gmail.com
-"""
-
 import errno
 import json
-import os
-import os.path as osp
+from pathlib import Path
 
 
 def mkdir_if_missing(directory):
-    if not osp.exists(directory):
+    directory_path = Path(directory)
+    if not directory_path.exists():
         try:
-            os.makedirs(directory)
+            directory_path.mkdir(parents=True, exist_ok=True)
         except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
 
 
 def check_isfile(path):
-    isfile = osp.isfile(path)
+    path_obj = Path(path)
+    isfile = path_obj.is_file()
     if not isfile:
         print("=> Warning: no file found at '{}' (ignored)".format(path))
     return isfile
@@ -33,6 +28,7 @@ def read_json(fpath):
 
 
 def write_json(obj, fpath):
-    mkdir_if_missing(osp.dirname(fpath))
-    with open(fpath, "w") as f:
+    fpath_obj = Path(fpath)
+    mkdir_if_missing(fpath_obj.parent)
+    with open(fpath_obj, "w") as f:
         json.dump(obj, f, indent=4, separators=(",", ": "))

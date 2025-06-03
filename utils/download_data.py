@@ -1,5 +1,5 @@
 import os
-import os.path as osp
+from pathlib import Path
 import gdown
 import zipfile
 
@@ -7,19 +7,19 @@ def download_data():
     """
     Downloads the dataset from Google Drive, extracts it, and removes the zip file.
     """
-    current_dir = os.getcwd()
-    target_dir = osp.join(current_dir, "data")
+    current_dir = Path.cwd()
+    target_dir = current_dir / "data"
 
     file_id = "0B8-rUzbwVRk0c054eEozWG9COHM"
     resource_key = "0-8nyl7K9_x37HlQm34MmrYQ"
-    destination = osp.join(target_dir, "dataset.zip")
+    destination = target_dir / "dataset.zip"
     
     url = f"https://drive.google.com/uc?id={file_id}&resourcekey={resource_key}"
     
     print(f"Downloading dataset to {target_dir}...")
     gdown.download(url, destination, quiet=False)
     
-    if not osp.exists(destination):
+    if not destination.exists():
         print("Error: Failed to download the dataset.")
         return False
     
@@ -48,17 +48,17 @@ def download_additional_files():
     """
     Downloads the additional files from Google Drive, extracts it, and removes the zip file.
     """
-    current_dir = os.getcwd()
-    target_dir = osp.join(current_dir, "data")
+    current_dir = Path.cwd()
+    target_dir = current_dir / "data"
 
-    destination = osp.join(target_dir, "additional.zip")
+    destination = target_dir / "additional.zip"
     
     url = f"https://drive.google.com/uc?export=download&id=1Yb5bl01yUKtI7v4F1Q3AiNSL68rtqHry"
     
     print(f"Downloading additional files to {target_dir}...")
     gdown.download(url, destination, quiet=False)
     
-    if not osp.exists(destination):
+    if not destination.exists():
         print("Error: Failed to download the additional files.")
         return False
     

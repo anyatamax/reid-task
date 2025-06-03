@@ -1,5 +1,5 @@
 import os
-import os.path as osp
+from pathlib import Path
 import subprocess
 import fire
 
@@ -10,14 +10,14 @@ def download_dvc_data(data_dir="data", dataset_name="Market-1501-v15.09.15.dvc",
     try:
         print(f"Downloading data from DVC remote to {data_dir}...")
 
-        current_dir = os.getcwd()
+        current_dir = Path.cwd()
         
-        if osp.basename(current_dir) != "reid-task":
-            os.chdir(osp.join(current_dir, "reid-task"))
+        if current_dir.name != "reid-task":
+            os.chdir(current_dir / "reid-task")
         
         cmd = ["dvc", "pull"]
-        target_path = osp.join(data_dir, dataset_name)
-        cmd.append(target_path)
+        target_path = Path(data_dir) / dataset_name
+        cmd.append(str(target_path))
 
         if remote:
             cmd.extend(["-r", remote])
@@ -34,7 +34,7 @@ def download_dvc_data(data_dir="data", dataset_name="Market-1501-v15.09.15.dvc",
         print(f"Error downloading data from DVC: {e}")
         return False
     finally:
-        if osp.basename(current_dir) != "reid-task":
+        if current_dir.name != "reid-task":
             os.chdir(current_dir)
 
 if __name__ == "__main__":
