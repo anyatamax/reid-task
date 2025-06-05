@@ -18,6 +18,7 @@ from pytorch_lightning.loggers import MLFlowLogger
 from configs.constants import (
     ACCELERATOR,
     DETERMINISTIC,
+    DEVICE,
     DEVICES,
     EARLY_STOPPING_MODE,
     EARLY_STOPPING_PATIENCE,
@@ -162,7 +163,9 @@ def main(cfg: DictConfig):
         model_after_stage2 = model_stage1.model
     else:
         print("Loading from checkpoint {}".format(model_path))
-        state_dict = torch.load(model_path, weights_only=True)
+        state_dict = torch.load(
+            model_path, weights_only=True, map_location=torch.device(DEVICE)
+        )
         new_state_dict = {}
         for k, v in state_dict.items():
             name = k.replace("module.", "") if k.startswith("module.") else k
@@ -236,7 +239,9 @@ def main(cfg: DictConfig):
         )
     else:
         print("Loading from checkpoint {} final model".format(model_final))
-        state_dict = torch.load(model_final, weights_only=True)
+        state_dict = torch.load(
+            model_final, weights_only=True, map_location=torch.device(DEVICE)
+        )
         new_state_dict = {}
         for k, v in state_dict.items():
             name = k.replace("module.", "") if k.startswith("module.") else k

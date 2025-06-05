@@ -6,6 +6,7 @@ from configs.constants import MODELS
 
 from .clip import clip
 from .clip.model import build_model
+from .clip.simple_tokenizer import SimpleTokenizer
 
 
 def weights_init_kaiming(m):
@@ -263,8 +264,8 @@ class PromptLearner(nn.Module):
         ctx_init = ctx_init.replace("_", " ")
         n_ctx = 4
 
-        # tokenized_prompts = clip.tokenize(ctx_init).cuda()
-        tokenized_prompts = clip.tokenize(ctx_init)
+        tokenizer = SimpleTokenizer()
+        tokenized_prompts = clip.tokenize(tokenizer, ctx_init)
         with torch.no_grad():
             embedding = token_embedding(tokenized_prompts).type(dtype)
         self.tokenized_prompts = tokenized_prompts  # torch.Tensor

@@ -5,10 +5,10 @@ import pytorch_lightning as pl
 import torch
 from omegaconf import DictConfig, OmegaConf
 
-from configs.constants import ACCELERATOR, DEVICES, PRECISION
+from configs.constants import ACCELERATOR, DEVICE, DEVICES, PRECISION
 from datasets.data import CLIPReIDDataModuleStage1
 from model.model_pl import CLIPReIDModuleStage1
-from utils.download_data import download_additional_files, download_data
+from utils.download_data import download_additional_files, download_data, download_model
 from utils.dvc_utils import download_dvc_data
 
 
@@ -38,9 +38,14 @@ def main(cfg: DictConfig):
     model_path = Path(cfg.output_dir) / cfg.testing.weight
     if not model_path.exists():
         print(
-            "Not found result model. Need to train in train_clipreid.py or download from dvc"
+            "Not found result model. Need to train in train_clipreid.py or download from dvc or download from article"
         )
-        return
+        if cfg.testing.load_from_article:
+            model_path = Path(cfg.output_dir) / cfg.testing.article_name_weight
+            if not model_path.exists():
+                download_model()
+        else:
+            return
 
     # Download data
     download(
@@ -76,7 +81,9 @@ def main(cfg: DictConfig):
     )
 
     print("Loading from checkpoint {}".format(model_path))
-    state_dict = torch.load(model_path, weights_only=True)
+    state_dict = torch.load(
+        model_path, weights_only=True, map_location=torch.device(DEVICE)
+    )
     new_state_dict = {}
     for k, v in state_dict.items():
         name = k.replace("module.", "") if k.startswith("module.") else k

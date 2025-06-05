@@ -17,3 +17,7 @@ neck_feat: "before"
 feat_norm: "yes"
 # Name for saving the distmat after testing
 dist_mat: "dist_mat.npy"
+# Load model from article
+load_from_article: True
+# Article name weight
+article_name_weight: "Market1501_clipreid_RN50_120.pth"

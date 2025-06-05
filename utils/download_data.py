@@ -19,7 +19,7 @@ def download_data():
     url = f"https://drive.google.com/uc?id={file_id}&resourcekey={resource_key}"
 
     print(f"Downloading dataset to {target_dir}...")
-    gdown.download(url, destination, quiet=False)
+    gdown.download(url, str(destination), quiet=False)
 
     if not destination.exists():
         print("Error: Failed to download the dataset.")
@@ -59,7 +59,7 @@ def download_additional_files():
     url = "https://drive.google.com/uc?export=download&id=1Yb5bl01yUKtI7v4F1Q3AiNSL68rtqHry"
 
     print(f"Downloading additional files to {target_dir}...")
-    gdown.download(url, destination, quiet=False)
+    gdown.download(url, str(destination), quiet=False)
 
     if not destination.exists():
         print("Error: Failed to download the additional files.")
@@ -84,6 +84,29 @@ def download_additional_files():
         print(f"Error during extraction: {e}")
         return False
 
+    return True
+
+
+def download_model():
+    """
+    Downloads the model from Google Drive.
+    """
+    current_dir = Path.cwd()
+    target_dir = current_dir / "model_chkp"
+
+    file_id = "1sBqCr5LxKcO9J2V0IvLQPb0wzwVzIZUp"
+    destination = target_dir / "Market1501_clipreid_RN50_120.pth"
+
+    url = f"https://drive.google.com/uc?id={file_id}"
+
+    print(f"Download model in: {target_dir}...")
+    gdown.download(url, str(destination), quiet=False)
+
+    if not destination.exists():
+        print("Error: Can't download model.")
+        return False
+
+    print(f"Model successfully downloaded to {destination}")
     return True
 
 

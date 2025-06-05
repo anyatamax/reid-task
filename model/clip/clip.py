@@ -11,8 +11,6 @@ from tqdm import tqdm
 
 from configs.constants import MODELS
 
-from .simple_tokenizer import SimpleTokenizer as _Tokenizer
-
 try:
     from torchvision.transforms import InterpolationMode
 
@@ -23,8 +21,6 @@ except ImportError:
 
 if torch.__version__.split(".") < ["1", "7", "1"]:
     warnings.warn("PyTorch version 1.7.1 or higher is recommended")
-
-_tokenizer = _Tokenizer()
 
 
 def _download(url: str, root: str = str(Path.home() / ".cache" / "clip")):
@@ -215,7 +211,10 @@ def available_models() -> List[str]:
 
 
 def tokenize(
-    texts: Union[str, List[str]], context_length: int = 77, truncate: bool = False
+    tokenizer,
+    texts: Union[str, List[str]],
+    context_length: int = 77,
+    truncate: bool = False,
 ) -> torch.LongTensor:
     """
     Returns the tokenized representation of given input string(s)
@@ -240,9 +239,9 @@ def tokenize(
     if isinstance(texts, str):
         texts = [texts]  # ['a photo of a face.']
 
-    sot_token = _tokenizer.encoder["<|startoftext|>"]  # 49406
-    eot_token = _tokenizer.encoder["<|endoftext|>"]  # 49407
-    all_tokens = [[sot_token] + _tokenizer.encode(text) + [eot_token] for text in texts]
+    sot_token = tokenizer.encoder["<|startoftext|>"]  # 49406
+    eot_token = tokenizer.encoder["<|endoftext|>"]  # 49407
+    all_tokens = [[sot_token] + tokenizer.encode(text) + [eot_token] for text in texts]
     result = torch.zeros(len(all_tokens), context_length, dtype=torch.long)  # 1,77
 
     for i, tokens in enumerate(all_tokens):
