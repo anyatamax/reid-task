@@ -53,12 +53,12 @@ def re_ranking(
     initial_rank = np.argsort(original_dist).astype(np.int32)
 
     # print('starting re_ranking')
-    for i in range(all_num):
+    for idx in range(all_num):
         # k-reciprocal neighbors
-        forward_k_neigh_index = initial_rank[i, : k1 + 1]
+        forward_k_neigh_index = initial_rank[idx, : k1 + 1]
         backward_k_neigh_index = initial_rank[forward_k_neigh_index, : k1 + 1]
-        fi = np.where(backward_k_neigh_index == i)[0]
-        k_reciprocal_index = forward_k_neigh_index[fi]
+        forward_idx_matches = np.where(backward_k_neigh_index == idx)[0]
+        k_reciprocal_index = forward_k_neigh_index[forward_idx_matches]
         k_reciprocal_expansion_index = k_reciprocal_index
         for j in range(len(k_reciprocal_index)):
             candidate = k_reciprocal_index[j]
@@ -68,8 +68,12 @@ def re_ranking(
             candidate_backward_k_neigh_index = initial_rank[
                 candidate_forward_k_neigh_index, : int(np.around(k1 / 2)) + 1
             ]
-            fi_candidate = np.where(candidate_backward_k_neigh_index == candidate)[0]
-            candidate_k_reciprocal_index = candidate_forward_k_neigh_index[fi_candidate]
+            candidate_idx_matches = np.where(
+                candidate_backward_k_neigh_index == candidate
+            )[0]
+            candidate_k_reciprocal_index = candidate_forward_k_neigh_index[
+                candidate_idx_matches
+            ]
             if len(
                 np.intersect1d(candidate_k_reciprocal_index, k_reciprocal_index)
             ) > 2 / 3 * len(candidate_k_reciprocal_index):
@@ -78,31 +82,31 @@ def re_ranking(
                 )
 
         k_reciprocal_expansion_index = np.unique(k_reciprocal_expansion_index)
-        weight = np.exp(-original_dist[i, k_reciprocal_expansion_index])
-        V[i, k_reciprocal_expansion_index] = weight / np.sum(weight)
+        weight = np.exp(-original_dist[idx, k_reciprocal_expansion_index])
+        V[idx, k_reciprocal_expansion_index] = weight / np.sum(weight)
     original_dist = original_dist[:query_num,]
     if k2 != 1:
-        V_qe = np.zeros_like(V, dtype=np.float16)
-        for i in range(all_num):
-            V_qe[i, :] = np.mean(V[initial_rank[i, :k2], :], axis=0)
-        V = V_qe
-        del V_qe
+        V_query_expansion = np.zeros_like(V, dtype=np.float16)
+        for idx in range(all_num):
+            V_query_expansion[idx, :] = np.mean(V[initial_rank[idx, :k2], :], axis=0)
+        V = V_query_expansion
+        del V_query_expansion
     del initial_rank
     invIndex = []
-    for i in range(gallery_num):
-        invIndex.append(np.where(V[:, i] != 0)[0])
+    for idx in range(gallery_num):
+        invIndex.append(np.where(V[:, idx] != 0)[0])
 
     jaccard_dist = np.zeros_like(original_dist, dtype=np.float16)
 
-    for i in range(query_num):
+    for query_idx in range(query_num):
         temp_min = np.zeros(shape=[1, gallery_num], dtype=np.float16)
-        indNonZero = np.where(V[i, :] != 0)[0]
+        indNonZero = np.where(V[query_idx, :] != 0)[0]
         indImages = [invIndex[ind] for ind in indNonZero]
         for j in range(len(indNonZero)):
             temp_min[0, indImages[j]] = temp_min[0, indImages[j]] + np.minimum(
-                V[i, indNonZero[j]], V[indImages[j], indNonZero[j]]
+                V[query_idx, indNonZero[j]], V[indImages[j], indNonZero[j]]
             )
-        jaccard_dist[i] = 1 - temp_min / (2 - temp_min)
+        jaccard_dist[query_idx] = 1 - temp_min / (2 - temp_min)
 
     final_dist = jaccard_dist * (1 - lambda_value) + original_dist * lambda_value
     del original_dist

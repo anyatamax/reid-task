@@ -51,16 +51,16 @@ class Bottleneck(nn.Module):
                 )
             )
 
-    def forward(self, x: torch.Tensor):
-        identity = x
+    def forward(self, input_tensor: torch.Tensor):
+        identity = input_tensor
 
-        out = self.relu(self.bn1(self.conv1(x)))
+        out = self.relu(self.bn1(self.conv1(input_tensor)))
         out = self.relu(self.bn2(self.conv2(out)))
         out = self.avgpool(out)
         out = self.bn3(self.conv3(out))
 
         if self.downsample is not None:
-            identity = self.downsample(x)
+            identity = self.downsample(input_tensor)
 
         out += identity
         out = self.relu(out)
@@ -81,17 +81,25 @@ class AttentionPool2d(nn.Module):
         self.c_proj = nn.Linear(embed_dim, output_dim or embed_dim)
         self.num_heads = num_heads
 
-    def forward(self, x):
-        x = x.reshape(x.shape[0], x.shape[1], x.shape[2] * x.shape[3]).permute(
+    def forward(self, input_tensor):
+        features = input_tensor.reshape(
+            input_tensor.shape[0],
+            input_tensor.shape[1],
+            input_tensor.shape[2] * input_tensor.shape[3],
+        ).permute(
             2, 0, 1
         )  # NCHW -> (HW)NC  #32,2048,7,7 ->49, 32, 2048
-        x = torch.cat([x.mean(dim=0, keepdim=True), x], dim=0)  # (HW+1)NC  50,32,2048
-        x = x + self.positional_embedding[:, None, :].to(x.dtype)  # (HW+1)NC
-        x, _ = F.multi_head_attention_forward(
-            query=x,
-            key=x,
-            value=x,
-            embed_dim_to_check=x.shape[-1],
+        features = torch.cat(
+            [features.mean(dim=0, keepdim=True), features], dim=0
+        )  # (HW+1)NC  50,32,2048
+        features = features + self.positional_embedding[:, None, :].to(
+            features.dtype
+        )  # (HW+1)NC
+        features, _ = F.multi_head_attention_forward(
+            query=features,
+            key=features,
+            value=features,
+            embed_dim_to_check=features.shape[-1],
             num_heads=self.num_heads,
             q_proj_weight=self.q_proj.weight,
             k_proj_weight=self.k_proj.weight,
@@ -111,7 +119,7 @@ class AttentionPool2d(nn.Module):
             need_weights=False,
         )
 
-        return x
+        return features
 
 
 class ModifiedResNet(nn.Module):
@@ -221,10 +229,10 @@ class ResidualAttentionBlock(nn.Module):
         )
         return self.attn(x, x, x, need_weights=False, attn_mask=self.attn_mask)[0]
 
-    def forward(self, x: torch.Tensor):
-        x = x + self.attention(self.ln_1(x))
-        x = x + self.mlp(self.ln_2(x))
-        return x
+    def forward(self, input_tensor: torch.Tensor):
+        output = input_tensor + self.attention(self.ln_1(input_tensor))
+        output = output + self.mlp(self.ln_2(output))
+        return output
 
 
 class Transformer(nn.Module):
@@ -238,8 +246,8 @@ class Transformer(nn.Module):
             *[ResidualAttentionBlock(width, heads, attn_mask) for _ in range(layers)]
         )
 
-    def forward(self, x: torch.Tensor):
-        return self.resblocks(x)
+    def forward(self, input_tensor: torch.Tensor):
+        return self.resblocks(input_tensor)
 
 
 class VisionTransformer(nn.Module):
@@ -278,38 +286,44 @@ class VisionTransformer(nn.Module):
         self.ln_post = LayerNorm(width)
         self.proj = nn.Parameter(scale * torch.randn(width, output_dim))
 
-    def forward(self, x: torch.Tensor, cv_emb=None):
-        x = self.conv1(x)  # shape = [*, width, grid, grid]
-        x = x.reshape(x.shape[0], x.shape[1], -1)  # shape = [*, width, grid ** 2]
-        x = x.permute(0, 2, 1)  # shape = [*, grid ** 2, width]
-        x = torch.cat(
+    def forward(self, input_tensor: torch.Tensor, cv_emb=None):
+        features = self.conv1(input_tensor)  # shape = [*, width, grid, grid]
+        features = features.reshape(
+            features.shape[0], features.shape[1], -1
+        )  # shape = [*, width, grid ** 2]
+        features = features.permute(0, 2, 1)  # shape = [*, grid ** 2, width]
+        features = torch.cat(
             [
-                self.class_embedding.to(x.dtype)
+                self.class_embedding.to(features.dtype)
                 + torch.zeros(
-                    x.shape[0], 1, x.shape[-1], dtype=x.dtype, device=x.device
+                    features.shape[0],
+                    1,
+                    features.shape[-1],
+                    dtype=features.dtype,
+                    device=features.device,
                 ),
-                x,
+                features,
             ],
             dim=1,
         )  # shape = [*, grid ** 2 + 1, width]
         if cv_emb is not None:
-            x[:, 0] = x[:, 0] + cv_emb
-        x = x + self.positional_embedding.to(x.dtype)
-        x = self.ln_pre(x)
+            features[:, 0] = features[:, 0] + cv_emb
+        features = features + self.positional_embedding.to(features.dtype)
+        features = self.ln_pre(features)
 
-        x = x.permute(1, 0, 2)  # NLD -> LND
+        features = features.permute(1, 0, 2)  # NLD -> LND
 
-        x11 = self.transformer.resblocks[:11](x)
-        x12 = self.transformer.resblocks[11](x11)
-        x11 = x11.permute(1, 0, 2)  # LND -> NLD
-        x12 = x12.permute(1, 0, 2)  # LND -> NLD
+        features_layer11 = self.transformer.resblocks[:11](features)
+        features_layer12 = self.transformer.resblocks[11](features_layer11)
+        features_layer11 = features_layer11.permute(1, 0, 2)  # LND -> NLD
+        features_layer12 = features_layer12.permute(1, 0, 2)  # LND -> NLD
 
-        x12 = self.ln_post(x12)
+        features_layer12 = self.ln_post(features_layer12)
 
         if self.proj is not None:
-            xproj = x12 @ self.proj
+            features_proj = features_layer12 @ self.proj
 
-        return x11, x12, xproj
+        return features_layer11, features_layer12, features_proj
 
 
 class CLIP(nn.Module):
