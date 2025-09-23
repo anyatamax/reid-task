@@ -13,6 +13,9 @@ files_dir: "additional_files"
 # Data dir
 data_dir: "data"
 
+# Captions file
+captions_json: "CUHK-PEDES/captions_parsed.json"
+
 # Root directory where datasets should be used (and downloaded if not found)
 root_dir: "/home/maksimovaam/ReID-diploma/reid-task/"
 

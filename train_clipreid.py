@@ -120,6 +120,9 @@ def main(cfg: DictConfig):
         num_query=dataset_info["num_query"],
     )
 
+    if data_module_stage1.use_graph_sampling:
+        data_module_stage1.set_model_for_graph_sampling(model_stage1.model)
+
     callbacks_stage1 = [
         ModelCheckpoint(
             dirpath=output_model_dir,

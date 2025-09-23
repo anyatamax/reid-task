@@ -3,32 +3,44 @@
 solver:
   # Random seed
   seed: 1234
-  # Margin of triplet loss
-  margin: 0.3
+  # # Margin of triplet loss
+  # margin: 0.3
+  # Margin of triplet loss (reduced for graph sampling - less aggressive separation)
+  margin: 0.2
   # Stage 1 and Stage 2
   stage1:
+    # # Images per batch
+    # ims_per_batch: 32
     # Images per batch
-    ims_per_batch: 32
+    ims_per_batch: 64
     # Optimizer name
     optimizer_name: "Adam"
     # Base learning rate
-    base_lr: 0.00035
+    base_lr: 0.00045
     # Warmup learning rate initial value
     warmup_lr_init: 0.00001
+    # # Base learning rate
+    # base_lr: 0.0005
+    # # Warmup learning rate initial value (slower start for graph sampling)
+    # warmup_lr_init: 0.00001
     # Minimum learning rate
-    lr_min: 1e-6
+    lr_min: 5e-5
     # Warmup method
     warmup_method: "linear"
     # Weight decay
     weight_decay: 1e-4
     # Weight decay for bias parameters
     weight_decay_bias: 1e-4
+    # # Weight decay (increased for graph sampling regularization)
+    # weight_decay: 2e-4
+    # # Weight decay for bias parameters  
+    # weight_decay_bias: 2e-4
     # Maximum number of epochs
-    max_epochs: 60
+    max_epochs: 100
     # Checkpoint period (save model every N epochs)
-    checkpoint_period: 60
-    # Warmup epochs
-    warmup_epochs: 5
+    checkpoint_period: 200
+    # Warmup epochs  
+    warmup_epochs: 10
     # Cosine margin
     cosine_margin: 0.5
     # Cosine scale
@@ -38,6 +50,8 @@ solver:
     # warm up factor
     warmup_factor: 0.01
     warmup_iters: 500
+    # num epoch for graph sampling
+    graph_sampling_epochs: 70
   stage2:
     # Images per batch
     ims_per_batch: 32
@@ -95,8 +109,8 @@ dataloader:
   num_workers: 4
   # Sampler for data loading
   sampler: "softmax_triplet"
-  # Number of instance for one batch
+  # Number of instance for one batch (увеличиваем для Graph Sampling)
   num_instance: 4
   # Graph sampling parameters
-  use_graph_sampling: False
-  graph_sampling_verbose: False
+  use_graph_sampling: True
+  graph_sampling_verbose: True

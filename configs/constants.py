@@ -7,7 +7,7 @@ PRECISION = "16-mixed"
 LOG_EVERY_N_STEPS = 10
 
 # Early stopping constants
-EARLY_STOPPING_PATIENCE = 10
+EARLY_STOPPING_PATIENCE = 15
 EARLY_STOPPING_MODE = "max"
 
 # Model checkpoint constants
@@ -33,5 +33,5 @@ MODELS = {
 }
 
 PATH_TO_BPE = (
-    "/home/maksimovaam/reid-task/data/additional_files/bpe_simple_vocab_16e6.txt.gz"
+    "/home/maksimovaam/ReID-diploma/reid-task/data/additional_files/bpe_simple_vocab_16e6.txt.gz"
 )

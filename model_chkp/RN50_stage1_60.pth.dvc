@@ -1,5 +1,0 @@
-outs:
-- md5: 0e4b6a9d9f4ccd795f8dea71caf9ebba
-  size: 323466359
-  hash: md5
-  path: RN50_stage1_60.pth

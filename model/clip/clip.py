@@ -214,7 +214,7 @@ def tokenize(
     tokenizer,
     texts: Union[str, List[str]],
     context_length: int = 77,
-    truncate: bool = False,
+    truncate: bool = True,
 ) -> torch.LongTensor:
     """
     Returns the tokenized representation of given input string(s)

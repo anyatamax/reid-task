@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 from timm.layers import trunc_normal_
+import json
+from pathlib import Path
 
 from configs.constants import MODELS
 
@@ -135,12 +137,33 @@ class build_transformer(nn.Module):
         get_text=False,
         cam_label=None,
         view_label=None,
+        captions=None,
     ):
         if get_text is True:
-            prompts = self.prompt_learner(label)
-            text_features = self.text_encoder(
-                prompts, self.prompt_learner.tokenized_prompts
-            )
+            prompts = self.prompt_learner(label, captions)
+            
+            if captions is not None:
+                # print("Captions in get_text != None")
+                text_features_list = []
+                for i, prompt in enumerate(prompts):
+                    single_prompt = prompt.unsqueeze(0)
+
+                    caption = captions[i] if i < len(captions) and captions[i] and captions[i].strip() else None
+                    if caption:
+                        tokenized_caption = clip.tokenize(self.prompt_learner.tokenizer, caption).to(single_prompt.device)
+                        text_feature = self.text_encoder(single_prompt, tokenized_caption)
+                        # print("Text feature from caption: ", text_feature)
+                    else:
+                        text_feature = self.text_encoder(single_prompt, self.prompt_learner.tokenized_prompts)
+                    text_features_list.append(text_feature)
+                
+                text_features = torch.cat(text_features_list, dim=0)
+            else:
+                # print("Captions in get_text = None")
+                text_features = self.text_encoder(
+                    prompts, self.prompt_learner.tokenized_prompts
+                )
+            
             return text_features
 
         if get_image is True:
@@ -254,21 +277,23 @@ def load_clip_to_cpu(backbone_name, h_resolution, w_resolution, vision_stride_si
 class PromptLearner(nn.Module):
     def __init__(self, num_class, dataset_name, dtype, token_embedding):
         super().__init__()
+        
         if dataset_name == "VehicleID" or dataset_name == "veri":
-            ctx_init = "A photo of a X X X X vehicle."
+            self.default_ctx_init = "A photo of a X X X X vehicle."
         else:
-            ctx_init = "A photo of a X X X X person."
+            self.default_ctx_init = "A photo of a X X X X person."
 
         ctx_dim = 512
-        # use given words to initialize context vectors
-        ctx_init = ctx_init.replace("_", " ")
         n_ctx = 4
 
-        tokenizer = SimpleTokenizer()
-        tokenized_prompts = clip.tokenize(tokenizer, ctx_init)
+        self.tokenizer = SimpleTokenizer()
+        self.token_embedding = token_embedding
+        self.dtype = dtype
+
+        default_tokenized_prompts = clip.tokenize(self.tokenizer, self.default_ctx_init)
         with torch.no_grad():
-            embedding = token_embedding(tokenized_prompts).type(dtype)
-        self.tokenized_prompts = tokenized_prompts  # torch.Tensor
+            default_embedding = token_embedding(default_tokenized_prompts).type(dtype)
+        self.tokenized_prompts = default_tokenized_prompts  # Fallback tokenized prompts
 
         n_cls_ctx = 4
         cls_vectors = torch.empty(num_class, n_cls_ctx, ctx_dim, dtype=dtype)
@@ -278,12 +303,19 @@ class PromptLearner(nn.Module):
         # These token vectors will be saved when in save_model(),
         # but they should be ignored in load_model() as we want to use
         # those computed using the current class names
-        self.register_buffer("token_prefix", embedding[:, : n_ctx + 1, :])
-        self.register_buffer("token_suffix", embedding[:, n_ctx + 1 + n_cls_ctx :, :])
+        self.register_buffer("token_prefix", default_embedding[:, : n_ctx + 1, :])
+        self.register_buffer("token_suffix", default_embedding[:, n_ctx + 1 + n_cls_ctx :, :])
         self.num_class = num_class
         self.n_cls_ctx = n_cls_ctx
 
-    def forward(self, label):
+    def forward(self, label, captions=None):
+        if captions is not None:
+            return self._forward_with_captions(label, captions)
+        else:
+            return self._forward_standard(label)
+    
+    def _forward_standard(self, label):
+        """Standard prompt generation using learnable context."""
         cls_ctx = self.cls_ctx[label]
         b = label.shape[0]
         prefix = self.token_prefix.expand(b, -1, -1)
@@ -298,4 +330,28 @@ class PromptLearner(nn.Module):
             dim=1,
         )
 
+        return prompts
+    
+    def _forward_with_captions(self, label, captions):
+        """Generate prompts using individual captions for each image."""
+        batch_size = label.shape[0]
+        prompts_list = []
+        
+        for i in range(batch_size):
+            caption = captions[i] if i < len(captions) and captions[i] and captions[i].strip() else None
+            
+            if caption:
+                tokenized_caption = clip.tokenize(self.tokenizer, caption).to(self.token_embedding.weight.device)
+                with torch.no_grad():
+                    caption_embedding = self.token_embedding(tokenized_caption).type(self.dtype)
+                prompts_list.append(caption_embedding.squeeze(0))
+            else:
+                cls_ctx = self.cls_ctx[label[i]].unsqueeze(0)
+                prefix = self.token_prefix
+                suffix = self.token_suffix
+                
+                standard_prompt = torch.cat([prefix, cls_ctx, suffix], dim=1)
+                prompts_list.append(standard_prompt.squeeze(0))
+        
+        prompts = torch.stack(prompts_list, dim=0)
         return prompts

@@ -140,3 +140,4 @@ model_chkp/*
 !model_chkp/*.dvc
 model_logs/
 lightning_logs/
+mlartifacts/

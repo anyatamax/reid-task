@@ -259,3 +259,64 @@ CUDA_VISIBLE_DEVICES=<number of your device> python test_clipreid.py
 нужно загрузить в продакшен все изображения из galery и хранить там все время,
 далее уже по одной картинке из query посылать на сервис и получать label из
 query
+
+# Эксперименты (пока только для Market-1501)
+
+## CNN_CLIP-ReID
+
+### Article
+```
+Test Results - Rank-1: 95.67% 
+Test Results - Rank-5: 98.69%
+Test Results - mAP: 89.82%
+```
+### My
+```
+Test Results - Rank-1: 95.22%
+Test Results - Rank-5: 98.57%
+Test Results - mAP: 88.66%
+```
+
+### With Graph Sampling 
+Использовался алгоритм Graph Sampling https://arxiv.org/pdf/2104.01546 на первой стадии для тектовых фичей.
+```
+Test Results - Rank-1: 95.67%
+Test Results - Rank-5: 98.57%
+Test Results - mAP: 89.01%
+```
+
+Так же пробовала первые 30 эпох рандомно выбирать батч, а остальные 70 через Graph Sampling. Причем пересчитывать не каждую эпоху, а каждую пятую эпоху
+```
+Test Results - Rank-1: 95.46%
+Test Results - Rank-5: 98.25%
+Test Results - mAP: 88.72%
+```
+
+Попробовать вместо cosine similarity использовать просто умножение
+```
+Test Results - Rank-1: 95.46%
+Test Results - Rank-5: 98.34%
+Test Results - mAP: 89.04%
+```
+
+### With captions from CUHK-PEDES 
+Использовались текстовые описания из датасета дял тех изображений для которых нашлись, они не тренировались на первой стадии, потому что у таких описаний не было обучаемых токенов. (эмбеддинги не правильно тренить, потому что они тогда заафектят тексы для которых нет caption, как вариант потом добавить к них обучаемые токены) 
+
+Captions in train Stage 1:  3078
+Number of images in train Stage 1:  12936 -> нашлось для 23% изображений
+```
+Test Results - Rank-1: 95.37%
+Test Results - Rank-5: 98.43%
+Test Results - mAP: 89.50%
+```
+попробовать на второй раз постоянно перестраивать выбор рандомных
+```
+Test Results - Rank-1: 95.52%
+Test Results - Rank-5: 98.31%
+Test Results - mAP: 89.16%
+```
+
+## ViT_CLIP-ReID
+
+1) Прогнать все для ViT
+2) На других датасетах пообучаться и качество замерить на других

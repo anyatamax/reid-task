@@ -1,0 +1,7 @@
+# Logging settings
+tesorboard_dir: "reid_logs"
+output_log_dir: "model_logs"
+mlflow_dir: "mlflow_reid_logs"
+experiment_name: "CLIP ReID Graph Sampling"
+run_name: "cnn_clipreid_gs_matrix_mult"
+mlflow_tracking_uri: "http://127.0.0.1:8080"

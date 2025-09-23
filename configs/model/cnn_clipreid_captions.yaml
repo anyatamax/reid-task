@@ -1,0 +1,50 @@
+# -----------------------------------------------------------------------------
+# MODEL
+# -----------------------------------------------------------------------------
+# Name of backbone
+name: "RN50"
+# Path to checkpoint
+model_chkp_name_stage1: "RN50_Captions_rebuild_stage2_stage1_60.pth"
+model_chkp_name_stage2: "CLIP-ReID_RN50_Captions_rebuild_stage2_final.pth"
+model_chkp_final_onnx: "CLIP-ReID_RN50_Captions_rebuild_stage2_final_onnx_format.onnx"
+# Last stride of backbone
+last_stride: 1
+# Path to pretrained model of backbone
+pretrain_path: ""
+# Use ImageNet pretrained model to initialize backbone or use self trained model to initialize the whole model
+# Options: 'imagenet', 'self', 'finetune'
+pretrain_choice: "imagenet"
+# If train with BNNeck, options: 'bnneck' or 'no'
+neck: "bnneck"
+# If train loss include center loss, options: 'yes' or 'no'
+if_with_center: "no"
+# ID loss type
+id_loss_type: "softmax"
+# ID loss weight
+id_loss_weight: 1.0
+# Triplet loss weight
+triplet_loss_weight: 1.0
+# Image to text loss weight
+i2t_loss_weight: 1.0
+# Metric loss type
+metric_loss_type: "triplet"
+# If train with soft triplet loss, options: true, false
+no_margin: false
+# If train with label smooth, options: 'on', 'off'
+if_labelsmooth: "on"
+# If train with arcface loss, options: true, false
+cos_layer: false
+# Features dim in CenterLoss
+feat_dim_center: 2048
+
+# Transformer settings
+drop_path: 0.1
+drop_out: 0.0
+att_drop_rate: 0.0
+transformer_type: "None"
+stride_size: [16, 16]
+
+# SIE Parameter
+sie_coe: 3.0
+sie_camera: false
+sie_view: false
