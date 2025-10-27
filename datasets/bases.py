@@ -1,11 +1,12 @@
-from pathlib import Path
 import json
 import random
+from pathlib import Path
 
 from PIL import Image, ImageFile
 from torch.utils.data import Dataset
 
 from utils.iotools import get_img_name_for_captions
+
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
@@ -125,11 +126,15 @@ class ImageDatasetWithCaptions(ImageDataset):
         self.captions = {}
 
         if captions_json_path and Path(captions_json_path).exists():
-            with open(captions_json_path, 'r', encoding='utf-8') as f:
+            with open(captions_json_path, "r", encoding="utf-8") as f:
                 self.captions = json.load(f)
-            print(f"ImageDatasetWithCaptions: Loaded {len(self.captions)} captions from {captions_json_path}")
+            print(
+                f"ImageDatasetWithCaptions: Loaded {len(self.captions)} captions from {captions_json_path}"
+            )
         else:
-            print(f"ImageDatasetWithCaptions: No captions found in {captions_json_path}")
+            print(
+                f"ImageDatasetWithCaptions: No captions found in {captions_json_path}"
+            )
 
     def __getitem__(self, index):
         img_path, pid, camid, trackid = self.dataset[index]

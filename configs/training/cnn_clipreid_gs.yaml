@@ -33,13 +33,13 @@ solver:
     weight_decay_bias: 1e-4
     # # Weight decay (increased for graph sampling regularization)
     # weight_decay: 2e-4
-    # # Weight decay for bias parameters  
+    # # Weight decay for bias parameters
     # weight_decay_bias: 2e-4
     # Maximum number of epochs
     max_epochs: 100
     # Checkpoint period (save model every N epochs)
     checkpoint_period: 200
-    # Warmup epochs  
+    # Warmup epochs
     warmup_epochs: 10
     # Cosine margin
     cosine_margin: 0.5

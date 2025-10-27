@@ -33,13 +33,14 @@ def write_json(obj, fpath):
     with open(fpath_obj, "w") as f:
         json.dump(obj, f, indent=4, separators=(",", ": "))
 
+
 def get_img_name_for_captions(captions_map, img_filename):
     # Base
     if img_filename in captions_map:
         return img_filename
-    
+
     # Try Market-1501 format
-    modified_name = img_filename[:-7] + '_00.jpg'
+    modified_name = img_filename[:-7] + "_00.jpg"
     if modified_name in captions_map:
         return modified_name
 
