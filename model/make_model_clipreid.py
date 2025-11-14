@@ -128,6 +128,11 @@ class build_transformer(nn.Module):
         self.prompt_learner = PromptLearner(
             num_classes, dataset_name, clip_model.dtype, clip_model.token_embedding
         )
+        
+        self.prompt_learner_stage0 = PromptLearnerStage0(
+            dtype=clip_model.dtype,
+            token_embedding=clip_model.token_embedding
+        )
         self.text_encoder = TextEncoder(clip_model)
 
     def forward(
@@ -136,10 +141,37 @@ class build_transformer(nn.Module):
         label=None,
         get_image=False,
         get_text=False,
+        is_stage0=False,
         cam_label=None,
         view_label=None,
         captions=None,
     ):
+        if is_stage0:
+            (
+                image_features_last,
+                image_features,
+                image_features_proj,
+            ) = self.image_encoder(x)
+            
+            if self.model_name == "RN50":
+                image_features_final = image_features_proj[0]
+            elif self.model_name == "ViT-B-16":
+                image_features_final = image_features_proj[:, 0]
+            else:
+                image_features_final = image_features_proj[0]
+            
+            if captions is not None:
+                prompts, tokenized_prompts = self.prompt_learner_stage0(captions)
+                text_features = self.text_encoder(prompts, tokenized_prompts)
+            else:
+                prompts = self.prompt_learner(label, captions)
+                text_features = self.text_encoder(prompts, self.prompt_learner.tokenized_prompts)
+            
+            return {
+                'image_features': image_features_final,
+                'text_features': text_features
+            }
+        
         if get_text is True:
             prompts = self.prompt_learner(label, captions)
 
@@ -283,6 +315,30 @@ def load_clip_to_cpu(backbone_name, h_resolution, w_resolution, vision_stride_si
     )
 
     return model
+
+
+class PromptLearnerStage0(nn.Module):
+    def __init__(self, dtype, token_embedding):
+        super().__init__()
+        self.tokenizer = SimpleTokenizer()
+        self.token_embedding = token_embedding
+        self.dtype = dtype
+    
+    def forward(self, captions):
+        """
+        Process captions directly for CLIP training.
+        Args:
+            captions: List[str] - Raw text captions
+        Returns:
+            prompts: Tensor - Token embeddings
+            tokenized_prompts: Tensor - Token IDs for EOT extraction
+        """
+        tokenized_prompts = clip.tokenize(self.tokenizer, captions).to(
+                    self.token_embedding.weight.device
+                )
+        prompts = self.token_embedding(tokenized_prompts).type(self.dtype)
+        
+        return prompts, tokenized_prompts
 
 
 class PromptLearner(nn.Module):

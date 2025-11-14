@@ -333,6 +333,56 @@ Test Results - Rank-5: 98.31%
 Test Results - mAP: 89.16%
 ```
 
+### Version 2
+
+### Graph sampling stage 2 Market  
+
+2
+```
+Test Results - Rank-1: 91.63%
+Test Results - Rank-5: 96.94%
+Test Results - mAP: 80.20%
+```
+3 (с другими настройками гиперпараметров)
+```
+Test Results - Rank-1: 92.61%
+Test Results - Rank-5: 97.57%
+Test Results - mAP: 81.11%
+```
+
+### Graph sampling stage 2 MSTM
+![](plots/Screenshot%202025-11-14%20at%2012.19.14.png)
+![](plots/Screenshot%202025-11-14%20at%2012.20.32.png)
+(с разными гиперпараметрами)
+```
+Test Results - Rank-1: 69.65%
+Test Results - Rank-5: 81.95%
+Test Results - mAP: 41.42%
+```
+
+### Stage 0 MSTM  
+without captions on stage 2
+```
+Test Results - Rank-1: 95.34%
+Test Results - Rank-5: 98.63%
+Test Results - mAP: 89.46%
+```
+
+with captions 
+```
+Test Results - Rank-1: 94.06%
+Test Results - Rank-5: 97.89%
+Test Results - mAP: 86.54%
+```
+
+with captions + graph sampling on stage 2
+```
+Test Results - Rank-1: 91.21%
+Test Results - Rank-5: 96.88%
+Test Results - mAP: 79.46%
+```
+
+
 ## ViT_CLIP-ReID
 
 1. Прогнать все для ViT

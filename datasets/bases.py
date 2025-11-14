@@ -150,3 +150,46 @@ class ImageDatasetWithCaptions(ImageDataset):
             return img, pid, camid, trackid, img_filename, random.choice(img_captions)
 
         return img, pid, camid, trackid, img_filename, None
+
+
+class ImageDatasetWithCaptionsOnly(ImageDataset):
+    def __init__(self, dataset, transform=None, captions_json_path=None):
+        self.transform = transform
+        self.captions = {}
+
+        if captions_json_path and Path(captions_json_path).exists():
+            with open(captions_json_path, "r", encoding="utf-8") as f:
+                self.captions = json.load(f)
+            print(f"ImageDatasetWithCaptionsOnly: Loaded {len(self.captions)} captions from {captions_json_path}")
+        else:
+            raise FileNotFoundError(f"Captions file required for Stage0: {captions_json_path}")
+
+        self.dataset = []
+        original_count = len(dataset)
+        
+        for img_path, pid, camid, trackid in dataset:
+            img_filename = img_path.split("/")[-1]
+            caption_key = get_img_name_for_captions(self.captions, img_filename)
+            
+            if caption_key:
+                self.dataset.append((img_path, pid, camid, trackid))
+        
+        filtered_count = len(self.dataset)
+        print(f"ImageDatasetWithCaptionsOnly: Filtered {original_count} → {filtered_count} images with captions")
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, index):
+        img_path, pid, camid, trackid = self.dataset[index]
+        img = read_image(img_path)
+        img_filename = img_path.split("/")[-1]
+
+        if self.transform is not None:
+            img = self.transform(img)
+
+        caption_key = get_img_name_for_captions(self.captions, img_filename)
+        img_captions = self.captions[caption_key]
+        selected_caption = random.choice(img_captions)
+        
+        return img, pid, camid, trackid, img_filename, selected_caption

@@ -1,0 +1,5 @@
+# Logging settings
+tensorboard_dir: "tensorboard_logs"
+output_log_dir: "model_logs"
+experiment_name: "CLIP ReID With Stage 0 and Captions"
+run_name: "cnn_clipreid_st0_captions_gs"

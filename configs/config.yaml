@@ -1,10 +1,10 @@
 defaults:
   - preprocessing: cnn_clipreid
-  - model: cnn_clipreid_captions
-  - training: cnn_clipreid_captions
+  - model: cnn_clipreid_stage0_captions
+  - training: cnn_clipreid_stage0_captions
   - dataset: market1501_with_captions
-  - testing: cnn_clipreid_captions
-  - logging: logging_captions
+  - testing: cnn_clipreid_stage0_captions
+  - logging: logging_stage0_captions
   - _self_
 
 # Output directory for logs and checkpoints

@@ -89,6 +89,8 @@ solver:
   text_features_viz: True
   # Text features 2D visualization frequency (visualize every N training steps)
   text_features_viz_frequency: 200
+  # Number of similar images to log
+  viz_n_similar: 5
 
 # DataLoader configuration
 dataloader:

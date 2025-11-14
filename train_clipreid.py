@@ -13,7 +13,7 @@ from pytorch_lightning.callbacks import (
     ModelCheckpoint,
     Timer,
 )
-from pytorch_lightning.loggers import MLFlowLogger
+from pytorch_lightning.loggers import TensorBoardLogger
 
 from configs.constants import (
     ACCELERATOR,
@@ -26,8 +26,8 @@ from configs.constants import (
     SAVE_LAST,
     SAVE_TOP_K,
 )
-from datasets.data import CLIPReIDDataModuleStage1, CLIPReIDDataModuleStage2
-from model.model_pl import CLIPReIDModuleStage1, CLIPReIDModuleStage2
+from datasets.data import CLIPReIDDataModuleStage0, CLIPReIDDataModuleStage1, CLIPReIDDataModuleStage2
+from model.model_pl import CLIPReIDModuleStage0, CLIPReIDModuleStage1, CLIPReIDModuleStage2
 from model.onnx_wrapper import CLIPReIDONNXWrapper
 from utils.download_data import download_additional_files, download_data
 from utils.dvc_utils import download_dvc_data
@@ -106,7 +106,76 @@ def main(cfg: DictConfig):
     if mp.get_start_method(allow_none=True) != "spawn":
         mp.set_start_method("spawn", force=True)
 
-    # Stage 1
+    model_after_stage0 = None
+    if cfg.training.compute_stage0:
+        print("Starting Stage0: CLIP Pretraining with Market1501 captions")
+
+        data_module_stage0 = CLIPReIDDataModuleStage0(cfg)
+        data_module_stage0.setup()
+        
+        dataset_info_stage0 = data_module_stage0.get_dataset_info()
+
+        model_stage0 = CLIPReIDModuleStage0(
+            cfg,
+            num_classes=dataset_info_stage0["num_classes"], 
+            camera_num=dataset_info_stage0["camera_num"],
+            view_num=dataset_info_stage0["view_num"],
+            num_query=dataset_info_stage0["num_query"]
+        )
+        
+        callbacks_stage0 = [
+            ModelCheckpoint(
+                dirpath=output_model_dir,
+                filename=f"{cfg.model.name}"
+                + "_stage0"
+                + "-{epoch:02d}-{train_loss_stage0:.4f}",
+                monitor="train_loss_stage0",
+                mode="min",
+                save_top_k=SAVE_TOP_K,
+                save_last=SAVE_LAST,
+            ),
+            LearningRateMonitor(logging_interval="epoch"),
+            Timer(),
+        ]
+        
+        logger_stage0 = TensorBoardLogger(
+            save_dir=output_log_dir,
+            name=cfg.logging.experiment_name,
+            version=cfg.logging.run_name + "_stage0",
+        )
+        
+        trainer_stage0 = pl.Trainer(
+            max_epochs=cfg.training.solver.stage0.max_epochs,
+            accelerator=ACCELERATOR,
+            devices=DEVICES,
+            strategy="auto",
+            precision=PRECISION,
+            deterministic=DETERMINISTIC,
+            callbacks=callbacks_stage0,
+            logger=logger_stage0,
+            log_every_n_steps=cfg.training.solver.log_period,
+            check_val_every_n_epoch=None,
+            num_sanity_val_steps=0,
+        )
+        
+        stage0_model_path = Path(cfg.output_dir) / cfg.model.model_chkp_name_stage0
+        if not stage0_model_path.exists():
+            print("Not found Stage0 checkpoint. Start training Stage 0")
+            trainer_stage0.fit(model_stage0, datamodule=data_module_stage0)
+            torch.save(model_stage0.model.state_dict(), stage0_model_path)
+            model_after_stage0 = model_stage0.model
+        else:
+            print("Loading from checkpoint {}".format(stage0_model_path))
+            state_dict = torch.load(
+                stage0_model_path, weights_only=True, map_location=torch.device(DEVICE)
+            )
+            new_state_dict = {}
+            for k, v in state_dict.items():
+                name = k.replace("module.", "") if k.startswith("module.") else k
+                new_state_dict[name] = v
+            model_after_stage0 = model_stage0.model
+            model_after_stage0.load_state_dict(new_state_dict, strict=False)
+
     data_module_stage1 = CLIPReIDDataModuleStage1(cfg)
     data_module_stage1.setup()
 
@@ -118,10 +187,11 @@ def main(cfg: DictConfig):
         camera_num=dataset_info["camera_num"],
         view_num=dataset_info["view_num"],
         num_query=dataset_info["num_query"],
+        model=model_after_stage0,
     )
-
-    if data_module_stage1.use_graph_sampling:
-        data_module_stage1.set_model_for_graph_sampling(model_stage1.model)
+    
+    if model_after_stage0 is not None:
+        print("✅ Stage1 initialized with Stage0 pretrained encoders!")
 
     callbacks_stage1 = [
         ModelCheckpoint(
@@ -138,11 +208,10 @@ def main(cfg: DictConfig):
         Timer(),
     ]
 
-    logger_stage1 = MLFlowLogger(
-        experiment_name=cfg.logging.experiment_name,
-        run_name=cfg.logging.run_name + "_stage1",
+    logger_stage1 = TensorBoardLogger(
         save_dir=output_log_dir,
-        tracking_uri=cfg.logging.mlflow_tracking_uri,
+        name=cfg.logging.experiment_name,
+        version=cfg.logging.run_name + "_stage1",
     )
 
     trainer_stage1 = pl.Trainer(
@@ -189,6 +258,9 @@ def main(cfg: DictConfig):
         num_query=dataset_info["num_query"],
     )
 
+    # if data_module_stage2.use_graph_sampling:
+    data_module_stage2.set_model_for_graph_sampling(model_stage2.model)
+
     callbacks_stage2 = [
         ModelCheckpoint(
             dirpath=output_model_dir,
@@ -201,20 +273,19 @@ def main(cfg: DictConfig):
             save_last=SAVE_LAST,
         ),
         LearningRateMonitor(logging_interval="epoch"),
-        EarlyStopping(
-            monitor="train_acc_stage2",
-            patience=EARLY_STOPPING_PATIENCE,
-            mode=EARLY_STOPPING_MODE,
-            verbose=True,
-        ),
+        # EarlyStopping(
+        #     monitor="train_acc_stage2",
+        #     patience=EARLY_STOPPING_PATIENCE,
+        #     mode=EARLY_STOPPING_MODE,
+        #     verbose=True,
+        # ),
         Timer(),
     ]
 
-    logger_stage2 = MLFlowLogger(
-        experiment_name=cfg.logging.experiment_name,
-        run_name=cfg.logging.run_name + "_stage2",
+    logger_stage2 = TensorBoardLogger(
         save_dir=output_log_dir,
-        tracking_uri=cfg.logging.mlflow_tracking_uri,
+        name=cfg.logging.experiment_name,
+        version=cfg.logging.run_name + "_stage2",
     )
 
     trainer_stage2 = pl.Trainer(

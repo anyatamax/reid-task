@@ -1,0 +1,145 @@
+# Training configuration with Stage0 CLIP pretraining
+
+compute_stage0: true
+
+solver:
+  # Random seed
+  seed: 1234
+  # Margin of triplet loss
+  margin: 0.3
+  
+  stage0:
+    # Images per batch
+    ims_per_batch: 64
+    # Number of epochs for CLIP pretraining
+    max_epochs: 80
+    # Checkpoint period (save every N epochs)
+    checkpoint_period: 100
+    # Optimizer type
+    optimizer_name: "AdamW"
+    # Base learning rate (слегка увеличиваем для лучшей сходимости)
+    base_lr: 8e-5
+    # Image encoder LR (очень маленький - предобученный)
+    image_encoder_lr: 1e-5
+    # Text encoder LR (очень маленький - предобученный)  
+    text_encoder_lr: 1e-5
+    # Token embedding LR (увеличиваем - нужна адаптация)
+    token_embedding_lr: 2e-4
+    # Weight decay
+    weight_decay: 1e-4
+    # Weight decay for bias
+    weight_decay_bias: 1e-4
+    # Bias learning rate factor
+    bias_lr_factor: 2
+    # Momentum for SGD
+    momentum: 0.9
+    # CLIP loss temperature
+    clip_temperature: 0.07
+    # Warmup method
+    warmup_method: "linear"
+    # Warmup epochs (увеличиваем для стабильности)
+    warmup_epochs: 10
+    # Warmup factor
+    warmup_factor: 0.01
+    # Learning rate decay steps (адаптируем под новое количество эпох)
+    steps: [40, 60, 80]
+    # Learning rate decay gamma (менее агрессивный)
+    gamma: 0.3
+    # Minimum learning rate
+    lr_min: 1e-6
+  stage1:
+    # Images per batch
+    ims_per_batch: 64
+    # Optimizer name
+    optimizer_name: "Adam"
+    # Base learning rate
+    base_lr: 0.00035
+    # Warmup learning rate initial value
+    warmup_lr_init: 0.00001
+    # Minimum learning rate
+    lr_min: 1e-6
+    # Warmup method
+    warmup_method: "linear"
+    # Weight decay
+    weight_decay: 1e-4
+    # Weight decay for bias parameters
+    weight_decay_bias: 1e-4
+    # Maximum number of epochs (увеличиваем - лосс убывает!)
+    max_epochs: 80
+    # Checkpoint period (save model every N epochs)
+    checkpoint_period: 60
+    # Warmup epochs (увеличиваем для стабильности)
+    warmup_epochs: 8
+    # Cosine margin
+    cosine_margin: 0.5
+    # Cosine scale
+    cosine_scale: 30
+    # Momentum
+    momentum: 0.9
+    # warm up factor
+    warmup_factor: 0.01
+    warmup_iters: 500
+  stage2:
+    # Images per batch
+    ims_per_batch: 64
+    # Optimizer name
+    optimizer_name: "Adam"
+    # Base learning rate (золотая середина для fine-tuning)
+    base_lr: 0.0003
+    # Warmup method
+    warmup_method: "linear"
+    # Warmup iterations (примерно 2-3 эпохи для стабильного старта)
+    warmup_iters: 100
+    # Warmup factor
+    warmup_factor: 0.01
+    # Weight decay (увеличиваем для регуляризации и лучшего mAP)
+    weight_decay: 0.001
+    # Weight decay for bias parameters
+    weight_decay_bias: 0.001
+    # Whether using larger learning rate for fc layer
+    large_fc_lr: false
+    # Maximum number of epochs
+    max_epochs: 200
+    # Checkpoint period (save model every N epochs)
+    checkpoint_period: 5
+    # Factor of learning bias
+    bias_lr_factor: 2
+    # Learning rate decay steps (оптимальное расписание без раннего коллапса)
+    steps: [30, 60, 100, 140, 170]
+    # Learning rate decay gamma (более мягкое снижение - LR не упадет слишком низко)
+    gamma: 0.3
+    # Learning rate of SGD to learn the centers of center loss
+    center_lr: 0.5
+    # Balanced weight of center loss (немного увеличиваем для лучшей дискриминативности)
+    center_loss_weight: 0.003
+    # Momentum
+    momentum: 0.9
+    # Cosine margin (можно немного увеличить для более жесткого разделения)
+    cosine_margin: 0.3
+    # Cosine scale
+    cosine_scale: 30
+    #  warm up epochs
+    warmup_epochs: 7
+    warmup_lr_init: 0.01
+    lr_min: 0.00001
+  # Log period (log training stats every N iterations)
+  log_period: 10
+  # Log period (log training stats every N iterations)
+  eval_period: 1
+  # Text features 2D visualization
+  text_features_viz: True
+  # Text features 2D visualization frequency (visualize every N training steps)
+  text_features_viz_frequency: 1000
+  # Number of similar images to log
+  viz_n_similar: 5
+
+# DataLoader configuration
+dataloader:
+  num_workers: 4
+  # Sampler for data loading
+  sampler: "softmax_triplet"
+  # Number of instance for one batch
+  num_instance: 4
+  # Graph sampling parameters
+  use_graph_sampling: True
+  graph_sampling_verbose: True

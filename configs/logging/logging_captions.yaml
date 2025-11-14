@@ -1,7 +1,5 @@
 # Logging settings
-tesorboard_dir: "reid_logs"
+tensorboard_dir: "tensorboard_logs"
 output_log_dir: "model_logs"
-mlflow_dir: "mlflow_reid_logs"
 experiment_name: "CLIP ReID With Captions"
-run_name: "cnn_clipreid_captions_rebuild_stage2"
-mlflow_tracking_uri: "http://127.0.0.1:8080"
+run_name: "cnn_clipreid_captions"

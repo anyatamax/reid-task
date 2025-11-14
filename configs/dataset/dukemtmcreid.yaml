@@ -1,0 +1,20 @@
+# -----------------------------------------------------------------------------
+# Dataset
+# -----------------------------------------------------------------------------
+# List of the dataset names for training, as present in paths_catalog.py
+names: "dukemtmcreid"
+
+# Name dir
+dataset_dir: "DukeMTMC"
+
+# Name files dir
+files_dir: "additional_files"
+
+# Data dir
+data_dir: "data"
+
+# Root directory where datasets should be used (and downloaded if not found)
+root_dir: "/home/maksimovaam/ReID-diploma/reid-task/"
+
+# The way to download data
+from_dvc: False

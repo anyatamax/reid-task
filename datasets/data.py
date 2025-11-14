@@ -12,10 +12,11 @@ from torch.utils.data import DataLoader
 # from .veri import VeRi
 from configs.constants import DEVICE
 
-from .bases import ImageDataset, ImageDatasetWithCaptions
+from .bases import ImageDataset, ImageDatasetWithCaptions, ImageDatasetWithCaptionsOnly
 from .graph_sampler import TextGraphSampler
 
-# from .dukemtmcreid import DukeMTMCreID
+from .dukemtmcreid import DukeMTMCreID
+from .msmt17 import MSMT17
 from .market1501 import Market1501
 
 # from .msmt17 import MSMT17
@@ -24,11 +25,8 @@ from .sampler import RandomIdentitySampler
 
 factory = {
     "market1501": Market1501,
-    # "dukemtmc": DukeMTMCreID,
-    # "msmt17": MSMT17,
-    # "occ_duke": OCC_DukeMTMCreID,
-    # "veri": VeRi,
-    # "VehicleID": VehicleID,
+    "dukemtmcreid": DukeMTMCreID,
+    "msmt17": MSMT17,
 }
 
 
@@ -67,6 +65,111 @@ def val_collate_fn(batch):
     return torch.stack(imgs, dim=0), pids, camids, camids_batch, viewids, img_paths
 
 
+class CLIPReIDDataModuleStage0(pl.LightningDataModule):
+    def __init__(self, cfg):
+        super().__init__()
+        self.cfg = cfg
+        
+        self.dataset_name = cfg.dataset.names
+        self.root_dir = cfg.dataset.root_dir
+        self.data_dir = cfg.dataset.data_dir
+        self.dataset_dir = cfg.dataset.dataset_dir
+        self.batch_size_stage0 = cfg.training.solver.stage0.ims_per_batch
+        self.test_batch_size = cfg.testing.ims_per_batch
+        self.num_workers = cfg.training.dataloader.num_workers
+        self.sampler = cfg.training.dataloader.sampler
+        self.num_instance = cfg.training.dataloader.num_instance
+
+        self.captions_json_path = (
+            Path(cfg.dataset.root_dir)
+            / cfg.dataset.data_dir
+            / cfg.dataset.captions_json
+        )
+
+        self.train_transforms = T.Compose([
+            T.Resize(cfg.preprocessing.size_train, interpolation=3),
+            T.RandomHorizontalFlip(p=cfg.preprocessing.prob),
+            T.Pad(cfg.preprocessing.padding),
+            T.RandomCrop(cfg.preprocessing.size_train),
+            T.ToTensor(),
+            T.Normalize(
+                mean=cfg.preprocessing.pixel_mean, 
+                std=cfg.preprocessing.pixel_std
+            ),
+            RandomErasing(
+                probability=cfg.preprocessing.re_prob * 0.5,  # Reduce random erasing
+                mode=cfg.preprocessing.re_mode,
+                max_count=1,
+                device=DEVICE,
+            ),
+        ])
+
+        self.val_transforms = T.Compose([
+            T.Resize(cfg.preprocessing.size_test),
+            T.ToTensor(),
+            T.Normalize(
+                mean=cfg.preprocessing.pixel_mean, 
+                std=cfg.preprocessing.pixel_std
+            ),
+        ])
+
+    def setup(self, stage=None):
+        self.dataset = factory[self.dataset_name](
+            root=self.root_dir, data_dir=self.data_dir, datast_dir=self.dataset_dir
+        )
+        self.num_classes = self.dataset.num_train_pids
+        self.cam_num = self.dataset.num_train_cams
+        self.view_num = self.dataset.num_train_vids
+        self.num_query = len(self.dataset.query)
+
+        if not self.captions_json_path.exists():
+            raise FileNotFoundError(
+                f"Stage0 requires captions file: {self.captions_json_path}\n"
+                f"Please ensure Market1501 captions are available for CLIP pretraining."
+            )
+
+        self.train_set = ImageDatasetWithCaptionsOnly(
+            self.dataset.train, 
+            self.train_transforms, 
+            self.captions_json_path
+        )
+
+        self.val_set = ImageDatasetWithCaptionsOnly(
+            self.dataset.query + self.dataset.gallery,
+            self.val_transforms,
+            self.captions_json_path
+        )
+
+    def train_dataloader(self):
+        return DataLoader(
+            self.train_set,
+            batch_size=self.batch_size_stage0,
+            shuffle=True,
+            num_workers=self.num_workers,
+            collate_fn=train_collate_fn,
+            persistent_workers=True,
+            drop_last=True,
+        )
+
+    def val_dataloader(self):
+        return DataLoader(
+            self.val_set,
+            batch_size=self.batch_size_stage0,
+            shuffle=False,
+            num_workers=self.num_workers,
+            collate_fn=train_collate_fn,
+            persistent_workers=True,
+        )
+
+    def get_dataset_info(self):
+        return {
+            "num_query": self.num_query,
+            "num_classes": self.num_classes,
+            "camera_num": self.cam_num,
+            "view_num": self.view_num,
+        }
+
+
 class CLIPReIDDataModuleStage1(pl.LightningDataModule):
     def __init__(self, cfg):
         super().__init__()
@@ -82,12 +185,9 @@ class CLIPReIDDataModuleStage1(pl.LightningDataModule):
         self.num_instance = cfg.training.dataloader.num_instance
 
         # Graph sampling parameters
-        self.use_graph_sampling = cfg.training.dataloader.use_graph_sampling
-        self.graph_sampling_verbose = getattr(
-            cfg.training.dataloader, "graph_sampling_verbose", False
-        )
-        self._model_for_sampling = None
-
+        self.use_graph_sampling = False
+        self.graph_sampling_verbose = False
+        
         if "captions_json" not in cfg.dataset:
             self.captions_json_path = None
         else:
@@ -178,9 +278,6 @@ class CLIPReIDDataModuleStage1(pl.LightningDataModule):
                 persistent_workers=True,
             )
 
-    def set_model_for_graph_sampling(self, model):
-        self._model_for_sampling = model
-
     def val_dataloader(self):
         return DataLoader(
             self.val_set,
@@ -215,8 +312,8 @@ class CLIPReIDDataModuleStage2(pl.LightningDataModule):
         self.num_instance = cfg.training.dataloader.num_instance
 
         # Graph sampling parameters
-        self.use_graph_sampling = False
-        self.graph_sampling_verbose = False
+        self.use_graph_sampling = cfg.training.dataloader.use_graph_sampling
+        self.graph_sampling_verbose = cfg.training.dataloader.graph_sampling_verbose
         self._model_for_sampling = None
 
         if "captions_json" not in cfg.dataset:
@@ -275,7 +372,26 @@ class CLIPReIDDataModuleStage2(pl.LightningDataModule):
         )
 
     def train_dataloader(self):
-        if "triplet" in self.sampler:
+        if self.use_graph_sampling and self._model_for_sampling is not None:       
+            sampler = TextGraphSampler(
+                data_source=self.dataset.train,
+                model=self._model_for_sampling,
+                captions_map=getattr(self.train_set, 'captions', {}),
+                batch_size=self.batch_size_stage2,
+                num_instance=self.num_instance,
+                verbose=self.graph_sampling_verbose
+            )
+            
+            return DataLoader(
+                self.train_set,
+                batch_size=self.batch_size_stage2,
+                sampler=sampler,
+                num_workers=self.num_workers,
+                collate_fn=train_collate_fn,
+                persistent_workers=True,
+            )
+            
+        elif "triplet" in self.sampler:
             return DataLoader(
                 self.train_set,
                 batch_size=self.batch_size_stage2,
@@ -303,6 +419,9 @@ class CLIPReIDDataModuleStage2(pl.LightningDataModule):
                     self.sampler
                 )
             )
+
+    def set_model_for_graph_sampling(self, model):
+        self._model_for_sampling = model
 
     def val_dataloader(self):
         return DataLoader(

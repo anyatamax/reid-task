@@ -65,6 +65,7 @@ class TextGraphSampler(Sampler):
 
         self.sam_index = None
         self.sam_pointer = [0] * self.num_pids
+        self.similarity_graph = None
 
         if self.verbose:
             print(
@@ -89,6 +90,10 @@ class TextGraphSampler(Sampler):
 
         with torch.no_grad():
             for pid in self.pids:
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                    torch.cuda.synchronize()
+                
                 img_paths = self.pid_to_paths[pid]
                 selected_path = np.random.choice(img_paths)
 
@@ -106,8 +111,8 @@ class TextGraphSampler(Sampler):
 
                 # No need to normalize - cosine_similarity function handles normalization internally
                 # Нормализуем features для матричного умножения
-                text_features = torch.nn.functional.normalize(text_features, p=2, dim=1)
-                class_text_features.append(text_features.cpu())
+                text_features = torch.nn.functional.normalize(text_features.cpu(), p=2, dim=1)
+                class_text_features.append(text_features)
                 class_labels.append(pid)
 
         if len(class_text_features) > 0:
@@ -162,6 +167,8 @@ class TextGraphSampler(Sampler):
     def make_index(self):
         class_features, _ = self._extract_text_features_for_classes()
         similarity_graph = self._build_similarity_graph(class_features)
+        
+        self.similarity_graph = similarity_graph
 
         sam_index = []
         for i, pid in enumerate(self.pids):

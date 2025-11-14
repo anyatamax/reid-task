@@ -7,7 +7,7 @@ PRECISION = "16-mixed"
 LOG_EVERY_N_STEPS = 10
 
 # Early stopping constants
-EARLY_STOPPING_PATIENCE = 15
+EARLY_STOPPING_PATIENCE = 60
 EARLY_STOPPING_MODE = "max"
 
 # Model checkpoint constants

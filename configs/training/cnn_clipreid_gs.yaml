@@ -3,14 +3,10 @@
 solver:
   # Random seed
   seed: 1234
-  # # Margin of triplet loss
-  # margin: 0.3
-  # Margin of triplet loss (reduced for graph sampling - less aggressive separation)
-  margin: 0.2
+  # Margin of triplet loss (optimized for MSMT17 mAP improvement)  
+  margin: 0.3
   # Stage 1 and Stage 2
   stage1:
-    # # Images per batch
-    # ims_per_batch: 32
     # Images per batch
     ims_per_batch: 64
     # Optimizer name
@@ -19,28 +15,20 @@ solver:
     base_lr: 0.00045
     # Warmup learning rate initial value
     warmup_lr_init: 0.00001
-    # # Base learning rate
-    # base_lr: 0.0005
-    # # Warmup learning rate initial value (slower start for graph sampling)
-    # warmup_lr_init: 0.00001
     # Minimum learning rate
-    lr_min: 5e-5
+    lr_min: 1e-6
     # Warmup method
     warmup_method: "linear"
     # Weight decay
     weight_decay: 1e-4
     # Weight decay for bias parameters
     weight_decay_bias: 1e-4
-    # # Weight decay (increased for graph sampling regularization)
-    # weight_decay: 2e-4
-    # # Weight decay for bias parameters
-    # weight_decay_bias: 2e-4
     # Maximum number of epochs
-    max_epochs: 100
+    max_epochs: 60
     # Checkpoint period (save model every N epochs)
     checkpoint_period: 200
     # Warmup epochs
-    warmup_epochs: 10
+    warmup_epochs: 5
     # Cosine margin
     cosine_margin: 0.5
     # Cosine scale
@@ -54,47 +42,47 @@ solver:
     graph_sampling_epochs: 70
   stage2:
     # Images per batch
-    ims_per_batch: 32
+    ims_per_batch: 64
     # Optimizer name
     optimizer_name: "Adam"
-    # Base learning rate
-    base_lr: 0.00035
+    # Base learning rate (increased for better mAP on MSMT17)
+    base_lr: 0.0002
     # Warmup method
     warmup_method: "linear"
     # Warmup iterations
     warmup_iters: 10
     # Warmup factor
     warmup_factor: 0.01
-    # Weight decay
-    weight_decay: 0.0005
+    # Weight decay (slightly increased for regularization)
+    weight_decay: 0.0007
     # Weight decay for bias parameters
-    weight_decay_bias: 0.0005
+    weight_decay_bias: 0.0007
     # Whether using larger learning rate for fc layer
     large_fc_lr: false
-    # Maximum number of epochs
-    max_epochs: 120
+    # Maximum number of epochs (optimized for MSMT17)
+    max_epochs: 130
     # Checkpoint period (save model every N epochs)
     checkpoint_period: 5
     # Factor of learning bias
     bias_lr_factor: 2
-    # Learning rate decay steps
-    steps: [40, 70]
-    # Learning rate decay gamma
-    gamma: 0.1
+    # Learning rate decay steps (aggressive end-stage decay for mAP)
+    steps: [30, 60, 85, 100]
+    # Learning rate decay gamma (more aggressive for better final convergence)
+    gamma: 0.35
     # Learning rate of SGD to learn the centers of center loss
     center_lr: 0.5
-    # Balanced weight of center loss
-    center_loss_weight: 0.0005
+    # Balanced weight of center loss (significantly increased for MSMT17 mAP)
+    center_loss_weight: 0.005
     # Momentum
     momentum: 0.9
-    # Cosine margin
-    cosine_margin: 0.5
-    # Cosine scale
-    cosine_scale: 30
-    #  warm up epochs
-    warmup_epochs: 5
-    warmup_lr_init: 0.01
-    lr_min: 0.000016
+    # Cosine margin (reduced for MSMT17)
+    cosine_margin: 0.3
+    # Cosine scale (increased for better separation on MSMT17)
+    cosine_scale: 64
+    #  warm up epochs (increased for MSMT17)
+    warmup_epochs: 10
+    warmup_lr_init: 0.0001
+    lr_min: 0.000005
   # Log period (log training stats every N iterations)
   log_period: 10
   # Log period (log training stats every N iterations)
@@ -103,6 +91,8 @@ solver:
   text_features_viz: True
   # Text features 2D visualization frequency (visualize every N training steps)
   text_features_viz_frequency: 200
+  # Number of similar images to log
+  viz_n_similar: 5
 
 # DataLoader configuration
 dataloader:
